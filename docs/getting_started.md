@@ -187,6 +187,119 @@ Formato: `contoso.sharepoint.com,xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx,yyyyyyyy-y
 
 Compartilhe este valor com o Administrador SP antes de prosseguir para a Etapa 4.
 
+#### Alternativas para obter o token (sem Azure CLI)
+
+Se você não tem Azure CLI instalado ou prefere outra abordagem, aqui estão as alternativas:
+
+##### Opção 1: Microsoft Graph Explorer (mais fácil, browser)
+
+1. Abra [Microsoft Graph Explorer](https://developer.microsoft.com/graph/graph-explorer)
+2. Clique em **Sign in** (Entrar) e autentique com sua conta do Microsoft 365
+3. Cole a URL de consulta no campo de entrada:
+   ```
+   https://graph.microsoft.com/v1.0/sites/<hostname>:/sites/<site-path>
+   ```
+4. Clique em **Run query** (Executar consulta)
+5. O token já é adquirido automaticamente — apenas copie o campo `id` da resposta
+
+**Vantagens:** Sem instalação necessária, interface visual, ideal para teste rápido.
+
+##### Opção 2: PowerShell com Microsoft Graph SDK
+
+```powershell
+# Instale o módulo (primeira vez apenas)
+Install-Module Microsoft.Graph -Scope CurrentUser
+
+# Conecte com sua conta
+Connect-MgGraph -Scopes "Sites.Read.All"
+
+# Consulte o site
+Get-MgSite -Search "<site-path>" | Select-Object Id
+```
+
+**Vantagens:** Nativo do Windows, script reutilizável.
+
+##### Opção 3: Python com MSAL (programático)
+
+Salve este script como `get_site_id.py`:
+
+```python
+import msal
+import requests
+
+# Configuração
+TENANT_ID = "<seu-tenant-id>"
+# Você precisará fazer login interativamente
+CLIENT_ID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"  # ID público do Azure CLI
+
+app = msal.PublicClientApplication(
+    client_id=CLIENT_ID,
+    authority=f"https://login.microsoftonline.com/{TENANT_ID}"
+)
+
+# Adquire token interativamente
+result = app.acquire_token_interactive(
+    scopes=["https://graph.microsoft.com/.default"]
+)
+
+if "access_token" in result:
+    token = result["access_token"]
+    
+    # Consulte o site
+    hostname = "contoso.sharepoint.com"
+    site_path = "sites/ProjectAlpha"
+    
+    response = requests.get(
+        f"https://graph.microsoft.com/v1.0/sites/{hostname}:/sites/{site_path}",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    
+    print(response.json()["id"])
+else:
+    print("Falha ao obter token:", result.get("error_description"))
+```
+
+Execute:
+```bash
+python get_site_id.py
+```
+
+**Vantagens:** Controle total, pode ser integrado em scripts Python.
+
+##### Opção 4: Postman (cliente HTTP visual)
+
+1. Baixe [Postman](https://www.postman.com/downloads/)
+2. Crie uma nova requisição GET
+3. URL: `https://graph.microsoft.com/v1.0/sites/<hostname>:/sites/<site-path>`
+4. Abra a aba **Authorization** → Tipo: **OAuth 2.0**
+5. Clique em **Get New Access Token** e autentique
+6. Clique em **Send** e copie o campo `id` da resposta
+
+**Vantagens:** Interface visual, útil se você trabalha com APIs frequentemente.
+
+##### Instalando Azure CLI (se preferir usar)
+
+**Windows:**
+```bash
+choco install azure-cli
+# ou download em https://aka.ms/installazurecliwindows
+```
+
+**macOS:**
+```bash
+brew install azure-cli
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+```
+
+**Verificar instalação:**
+```bash
+az version
+```
+
 ---
 
 ### Etapa 4 — Inscrever o site para o aplicativo
