@@ -7,6 +7,8 @@ authenticated HTTP requests to the Graph API endpoint.
 
 from __future__ import annotations
 
+from typing import Any
+
 import requests
 
 from msgraphtest.auth import get_access_token
@@ -35,12 +37,13 @@ class GraphClient:
             }
         )
 
-    def get(self, path: str, **kwargs: dict) -> dict:
+    def get(self, path: str, **kwargs: Any) -> dict:
         """Make a GET request to the Graph API.
 
         Args:
             path: The API endpoint path (e.g., ``"/me"``).
-            **kwargs: Additional arguments to pass to requests.Session.get().
+            **kwargs: Additional arguments to pass to requests.Session.get() (params,
+                timeout, verify, etc.).
 
         Returns:
             The JSON response body as a dict.
@@ -53,13 +56,14 @@ class GraphClient:
         response.raise_for_status()
         return response.json()
 
-    def post(self, path: str, json: dict, **kwargs: dict) -> dict:
+    def post(self, path: str, json: dict, **kwargs: Any) -> dict:
         """Make a POST request to the Graph API.
 
         Args:
             path: The API endpoint path.
             json: The JSON body to send with the request.
-            **kwargs: Additional arguments to pass to requests.Session.post().
+            **kwargs: Additional arguments to pass to requests.Session.post() (data,
+                headers, timeout, verify, etc.).
 
         Returns:
             The JSON response body as a dict.
@@ -72,13 +76,14 @@ class GraphClient:
         response.raise_for_status()
         return response.json()
 
-    def patch(self, path: str, json: dict, **kwargs: dict) -> dict:
+    def patch(self, path: str, json: dict, **kwargs: Any) -> dict:
         """Make a PATCH request to the Graph API.
 
         Args:
             path: The API endpoint path.
             json: The JSON body containing the fields to update.
-            **kwargs: Additional arguments to pass to requests.Session.patch().
+            **kwargs: Additional arguments to pass to requests.Session.patch() (data,
+                headers, timeout, verify, etc.).
 
         Returns:
             The JSON response body as a dict.
@@ -96,7 +101,7 @@ class GraphClient:
         path: str,
         data: bytes,
         content_type: str = "application/octet-stream",
-        **kwargs: dict,
+        **kwargs: Any,
     ) -> dict:
         """Make a PUT request to the Graph API with binary data.
 
@@ -105,7 +110,8 @@ class GraphClient:
             data: The binary data to send in the request body.
             content_type: The MIME type of the data. Defaults to
                 ``"application/octet-stream"``.
-            **kwargs: Additional arguments to pass to requests.Session.put().
+            **kwargs: Additional arguments to pass to requests.Session.put() (headers,
+                timeout, verify, etc.).
 
         Returns:
             The JSON response body as a dict.
@@ -119,12 +125,13 @@ class GraphClient:
         response.raise_for_status()
         return response.json()
 
-    def get_raw(self, path: str, **kwargs: dict) -> bytes:
+    def get_raw(self, path: str, **kwargs: Any) -> bytes:
         """Make a GET request and return the raw binary response.
 
         Args:
             path: The API endpoint path.
-            **kwargs: Additional arguments to pass to requests.Session.get().
+            **kwargs: Additional arguments to pass to requests.Session.get() (params,
+                timeout, verify, etc.).
 
         Returns:
             The raw response content as bytes.
