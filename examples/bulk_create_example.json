@@ -1,0 +1,33 @@
+[
+    {
+        "name": "app-sharepoint-sales",
+        "display_name": "Sales Team SharePoint Access",
+        "auth_type": "app_only",
+        "sign_in_audience": "AzureADMyOrg",
+        "site_id": "contoso.sharepoint.com,11111111-1111-1111-1111-111111111111,22222222-2222-2222-2222-222222222222",
+        "access_type": "leitura",
+        "secret_display_name": "sales-app-secret",
+        "secret_expiration_date": "11/05/2028"
+    },
+    {
+        "name": "app-sharepoint-hr",
+        "display_name": "HR Department SharePoint Access",
+        "auth_type": "app_only",
+        "sign_in_audience": "AzureADMyOrg",
+        "site_id": "contoso.sharepoint.com,33333333-3333-3333-3333-333333333333,44444444-4444-4444-4444-444444444444",
+        "access_type": "escrita",
+        "secret_display_name": "hr-app-secret",
+        "secret_expiration_date": "10/05/2027"
+    },
+    {
+        "name": "app-sharepoint-portal",
+        "display_name": "Portal Delegated Access",
+        "auth_type": "delegated",
+        "sign_in_audience": "AzureADMyOrg",
+        "site_id": "contoso.sharepoint.com,55555555-5555-5555-5555-555555555555,66666666-6666-6666-6666-666666666666",
+        "access_type": "leitura",
+        "redirect_uri": "http://localhost:8000",
+        "secret_display_name": "portal-app-secret",
+        "secret_expiration_date": "15/06/2028"
+    }
+]

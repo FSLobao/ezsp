@@ -41,13 +41,15 @@ Este guia usa exclusivamente interfaces web: **portal do Azure** e **Microsoft G
 
 > 🔧 **Equipe de desenvolvimento** adiciona a permissão. 🔑 **Administrador Entra** concede consentimento.
 
-1. No registro de aplicativo vá para **Permissões de API** → **Adicionar uma permissão** → **Microsoft Graph** → **Permissões de aplicativo**.
-2. Pesquise e adicione **`Sites.Selected`** apenas.
-3. Clique em **Conceder consentimento de administrador para \<tenant\>** e confirme.
+1. No registro de aplicativo vá para **Permissões de API** → **Adicionar uma permissão** → **Microsoft Graph**.
+2. Para apps `app_only`, escolha **Permissões de aplicativo** e adicione **`Sites.Selected`**.
+3. Para apps `delegated`, escolha **Permissões delegadas** e adicione **`Sites.Selected`**.
+4. Não adicione `Sites.Read.All` nem `Sites.ReadWrite.All`; este repositório não usa autorizações de dados no nível do tenant.
+5. Clique em **Conceder consentimento de administrador para <tenant>** e confirme.
 
 > ⚠️ Esta ação requer **Administrador global** ou **Administrador de função com privilégios** (*Privileged Role Administrator*) — a função Administrador de Aplicativos não é suficiente para permissões de aplicativo do Microsoft Graph.
 
-> `Sites.Selected` não concede acesso a nenhum site ainda — isso acontece na Etapa 4.
+> `Sites.Selected` não concede acesso a nenhum site ainda — isso acontece na Etapa 4 para ambos os fluxos. No caso delegado, o acesso final ainda será a interseção entre a concessão do site e as permissões do usuário autenticado.
 
 ---
 

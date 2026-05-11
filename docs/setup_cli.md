@@ -118,16 +118,33 @@ Write-Host "AZURE_CLIENT_SECRET=$AZURE_CLIENT_SECRET"
 
 > ⚠️ O consentimento requer **Administrador global** ou **Administrador de função com privilégios** (*Privileged Role Administrator*) — a função Administrador de Aplicativos não é suficiente para permissões de aplicativo do Microsoft Graph.
 
+> Use `Sites.Selected` tanto para apps `app_only` quanto para apps `delegated`. O que muda é o tipo do consentimento: `Role` para `app_only` e `Scope` para `delegated`. Não são usadas permissões amplas como `Sites.Read.All` ou `Sites.ReadWrite.All`.
+
 ### Azure CLI
 
 ```bash
-# Adicionar permissão Sites.Selected
-# App ID do Microsoft Graph : 00000003-0000-0000-c000-000000000000
-# App Role ID de Sites.Selected: 883ea226-0bf2-4a8f-9f9d-92c7314d094b
+# Resolver dinamicamente o ID de Sites.Selected no Microsoft Graph
+APP_ONLY_SITES_SELECTED_ID=$(az ad sp show \
+  --id 00000003-0000-0000-c000-000000000000 \
+  --query "appRoles[?value=='Sites.Selected' && contains(allowedMemberTypes, 'Application')] | [0].id" \
+  -o tsv)
+
+DELEGATED_SITES_SELECTED_ID=$(az ad sp show \
+  --id 00000003-0000-0000-c000-000000000000 \
+  --query "oauth2PermissionScopes[?value=='Sites.Selected'] | [0].id" \
+  -o tsv)
+
+# Para app_only (client credentials)
 az ad app permission add \
   --id $APP_OBJECT_ID \
   --api 00000003-0000-0000-c000-000000000000 \
-  --api-permissions "883ea226-0bf2-4a8f-9f9d-92c7314d094b=Role"
+  --api-permissions "${APP_ONLY_SITES_SELECTED_ID}=Role"
+
+# Para delegated (authorization code)
+az ad app permission add \
+  --id $APP_OBJECT_ID \
+  --api 00000003-0000-0000-c000-000000000000 \
+  --api-permissions "${DELEGATED_SITES_SELECTED_ID}=Scope"
 
 # Conceder consentimento de administrador
 az ad app permission admin-consent --id $APP_OBJECT_ID
@@ -138,27 +155,49 @@ az ad app permission admin-consent --id $APP_OBJECT_ID
 ```powershell
 # Obter service principal do Microsoft Graph
 $graphSP = Get-MgServicePrincipal -Filter "AppId eq '00000003-0000-0000-c000-000000000000'"
-$sitesSelectedRole = $graphSP.AppRoles | Where-Object { $_.Value -eq "Sites.Selected" }
+$sitesSelectedAppPermission = $graphSP.AppRoles | Where-Object {
+  $_.Value -eq "Sites.Selected" -and $_.AllowedMemberTypes -contains "Application"
+} | Select-Object -First 1
+$sitesSelectedDelegatedPermission = $graphSP.Oauth2PermissionScopes | Where-Object {
+  $_.Value -eq "Sites.Selected"
+} | Select-Object -First 1
 
-# Adicionar permissão ao registro de aplicativo
+# Adicionar permissão ao registro de aplicativo para app_only
 $requiredAccess = @{
   ResourceAppId  = "00000003-0000-0000-c000-000000000000"
   ResourceAccess = @(
-    @{ Id = $sitesSelectedRole.Id; Type = "Role" }
+    @{ Id = $sitesSelectedAppPermission.Id; Type = "Role" }
   )
 }
 Update-MgApplication -ApplicationId $app.Id `
   -RequiredResourceAccess @($requiredAccess)
 
+# Adicionar permissão ao registro de aplicativo para delegated
+$requiredAccessDelegated = @{
+  ResourceAppId  = "00000003-0000-0000-c000-000000000000"
+  ResourceAccess = @(
+    @{ Id = $sitesSelectedDelegatedPermission.Id; Type = "Scope" }
+  )
+}
+Update-MgApplication -ApplicationId $app.Id `
+  -RequiredResourceAccess @($requiredAccessDelegated)
+
 # Criar service principal para o aplicativo (necessário para o consentimento)
 $sp = New-MgServicePrincipal -AppId $AZURE_CLIENT_ID
 
-# Conceder consentimento de administrador
+# Conceder consentimento de administrador para app_only
 New-MgServicePrincipalAppRoleAssignment `
   -ServicePrincipalId $sp.Id `
   -PrincipalId        $sp.Id `
   -ResourceId         $graphSP.Id `
-  -AppRoleId          $sitesSelectedRole.Id
+  -AppRoleId          $sitesSelectedAppPermission.Id
+
+# Conceder consentimento de administrador para delegated
+New-MgOauth2PermissionGrant `
+  -ClientId    $sp.Id `
+  -ConsentType "AllPrincipals" `
+  -ResourceId  $graphSP.Id `
+  -Scope       "Sites.Selected"
 ```
 
 > `Sites.Selected` não concede acesso a nenhum site ainda — isso acontece na Etapa 4.

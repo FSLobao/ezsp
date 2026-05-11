@@ -10,7 +10,7 @@ Este guia configura o acesso ao SharePoint via Microsoft Graph API usando o **fl
 > | Login necessário | Não — execução sem supervisão | Sim — a cada execução |
 > | Trilha de auditoria | Identidade do aplicativo | Identidade do usuário individual |
 > | Permissões necessárias | Permissões de aplicativo (`Role`) | Permissões delegadas (`Scope`) |
-> | Etapa 4 (inscrever site) | Obrigatória | **Não necessária** — o acesso do usuário ao site é respeitado diretamente |
+> | Etapa 4 (inscrever site) | Obrigatória | Obrigatória |
 >
 > Use autenticação delegada quando seus requisitos de governança ou conformidade exigirem trilha de auditoria vinculando cada ação do SharePoint a um usuário nomeado.
 
@@ -20,15 +20,16 @@ Para configuração com credenciais do cliente (sem login de usuário), veja [se
 
 ## Quem faz o quê — visão geral
 
-| Etapa | Ação | 🔧 Desenvolvimento | 🔑 Administrador Entra |
-|---|---|:---:|:---:|
-| 1 | Criar registro de aplicativo com URI de redirecionamento | ✅ | |
-| 2 | Adicionar permissões delegadas do SharePoint | ✅ | |
-| 3 | Conceder consentimento de administrador (opcional) | | ✅ |
-| 4 | Adaptar `auth.py` para o fluxo interativo | ✅ | |
-| 5 | Configurar `.env` e executar | ✅ | |
+| Etapa | Ação | 🔧 Desenvolvimento | 🔑 Administrador Entra | 🛡️ Administrador SP |
+|---|---|:---:|:---:|:---:|
+| 1 | Criar registro de aplicativo com URI de redirecionamento | ✅ | | |
+| 2 | Adicionar `Sites.Selected` como permissão delegada | ✅ | | |
+| 3 | Conceder consentimento de administrador | | ✅ | |
+| 4 | Inscrever o site via `POST /sites/{id}/permissions` | | | ✅ |
+| 5 | Adaptar `auth.py` para o fluxo interativo | ✅ | | |
+| 6 | Configurar `.env` e executar | ✅ | | |
 
-> **Nota:** A Etapa 4 do guia de credenciais do cliente (inscrever o site via `POST /sites/{id}/permissions`) **não existe** neste fluxo. O acesso do aplicativo é limitado ao que o usuário autenticado já tem permissão no SharePoint — nenhuma configuração adicional de administrador SP é necessária.
+> **Nota:** Neste projeto, a autenticação delegada também é sempre restringida a um site concreto. O usuário autenticado precisa ter acesso ao site e a aplicação precisa ter `Sites.Selected` consentido e uma concessão explícita no site. Não são usadas permissões amplas como `Sites.Read.All` ou `Sites.ReadWrite.All`.
 
 ---
 
@@ -51,43 +52,54 @@ Para configuração com credenciais do cliente (sem login de usuário), veja [se
 
 ---
 
-## Etapa 2 — Adicionar permissões delegadas do SharePoint
+## Etapa 2 — Adicionar `Sites.Selected` como permissão delegada
 
 > 🔧 **Equipe de desenvolvimento**
 
-As permissões delegadas controlam o que o aplicativo pode fazer **em nome do usuário autenticado**. O aplicativo nunca terá mais acesso do que o próprio usuário possui no SharePoint.
+As permissões delegadas controlam o que o aplicativo pode fazer **em nome do usuário autenticado**. Neste projeto, a permissão delegada usada é `Sites.Selected`, para que o aplicativo só consiga operar em sites explicitamente inscritos.
 
 1. No registro de aplicativo, vá para **Permissões de API** → **Adicionar uma permissão** → **Microsoft Graph** → **Permissões delegadas**.
-2. Adicione as permissões necessárias para o seu caso de uso:
+2. Adicione **`Sites.Selected`** e, se necessário para evitar novo login frequente, também **`offline_access`**.
 
 | Permissão delegada | Necessária para |
 |---|---|
-| `Sites.Read.All` | Listar sites, drives e arquivos; ler listas |
-| `Sites.ReadWrite.All` | Criar/atualizar itens de lista; enviar arquivos |
-| `Files.Read.All` | Baixar conteúdo de arquivos em drives |
-| `Files.ReadWrite.All` | Enviar ou sobrescrever arquivos em drives |
+| `Sites.Selected` | Restringir o aplicativo aos sites explicitamente inscritos |
 | `offline_access` | Obter refresh token para renovar a sessão sem novo login |
 
-> Use o conjunto mínimo que sua aplicação precisa. Para casos de somente leitura, `Sites.Read.All` e `Files.Read.All` são suficientes.
+> `Sites.Selected` não concede acesso a nenhum site por si só. A aplicação só conseguirá ler ou escrever no site depois da inscrição da Etapa 4 e sempre limitada ao que o usuário autenticado já puder fazer nesse mesmo site.
 
 3. Clique em **Adicionar permissões**.
 
 ---
 
-## Etapa 3 — Consentimento de administrador (opcional)
+## Etapa 3 — Consentimento de administrador
 
-> 🔑 **Administrador Entra** (opcional)
+> 🔑 **Administrador Entra**
 
-Por padrão, cada usuário deverá consentir individualmente com as permissões na primeira execução. Para suprimir essa tela de consentimento para todos os usuários do tenant:
+Para que o aplicativo use `Sites.Selected` de forma controlada em todo o tenant, conceda consentimento administrativo ao escopo delegado:
 
 1. No registro de aplicativo, vá para **Permissões de API**.
 2. Clique em **Conceder consentimento de administrador para \<tenant\>** e confirme.
 
-> Se este passo for omitido, cada usuário verá uma tela de consentimento na primeira vez que executar o aplicativo — o que é aceitável na maioria dos cenários.
+> Este consentimento não concede acesso a todos os sites. Ele apenas autoriza o uso do escopo `Sites.Selected`; o acesso aos dados continua dependente da inscrição do site na Etapa 4.
 
 ---
 
-## Etapa 4 — Adaptar `auth.py` para o fluxo interativo
+## Etapa 4 — Inscrever o site para o aplicativo
+
+> 🛡️ **Administrador SP** (administrador do tenant do SharePoint)
+
+Siga a mesma inscrição por site descrita na Etapa 4 de [setup_portal.md](setup_portal.md) ou [setup_cli.md](setup_cli.md):
+
+1. Obtenha o `SHAREPOINT_SITE_ID` do site que a aplicação poderá acessar.
+2. Execute `POST /sites/{site-id}/permissions` com o `AZURE_CLIENT_ID` da aplicação e o papel `read` ou `write`.
+3. Guarde o `site_id` para configuração local e para os scripts de automação em lote.
+
+> O acesso efetivo em runtime será a interseção entre: 1) o papel atribuído ao aplicativo nesse site e 2) as permissões do usuário autenticado no próprio site.
+
+---
+
+## Etapa 5 — Adaptar `auth.py` para o fluxo interativo
 
 > 🔧 **Equipe de desenvolvimento**
 
@@ -122,8 +134,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GRAPH_SCOPES = [
-    "https://graph.microsoft.com/Sites.ReadWrite.All",
-    "https://graph.microsoft.com/Files.ReadWrite.All",
+    "https://graph.microsoft.com/Sites.Selected",
     "offline_access",
 ]
 
@@ -208,7 +219,7 @@ Adicione ao `.gitignore`:
 
 ---
 
-## Etapa 5 — Configurar `.env` e executar
+## Etapa 6 — Configurar `.env` e executar
 
 > 🔧 **Equipe de desenvolvimento**
 

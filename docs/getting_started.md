@@ -11,6 +11,23 @@ Guias adicionais são providos para configuração passo a passo, de acordo com 
 **Autenticação delegada (usuário) — com login interativo e trilha de auditoria por usuário:**
 - [**Autenticação Delegada**](setup_delegated_auth.md) — fluxo de código de autorização OAuth 2.0; o aplicativo age em nome do usuário autenticado.
 
+---
+
+## Criação em lote de aplicações
+
+Se você precisa criar **múltiplas aplicações Azure AD** automaticamente, use:
+
+- **PowerShell (recomendado)**: `.\.\src/bulkCreate/Bulk-CreateApps.ps1 -InputPath config.json`
+  - Já instalado no Windows, requer só Microsoft.Graph SDK
+- **Python (alternativa)**: `python -m bulkCreate.bulk_create_apps config.json`
+  - Requer Azure CLI ou PowerShell SDK instalados
+
+**Dica de sessão**: Autentique uma vez com `Connect-MgGraph` e execute múltiplas vezes com `-SkipLogin` (PowerShell) ou `--skip-login` (Python).
+
+Veja [bulk_create_apps.md](bulk_create_apps.md) para instruções detalhadas, exemplos de entrada JSON e como recuperar as credenciais geradas.
+
+---
+
 ## Funções envolvidas
 
 Três funções distintas participam da configuração de acesso de aplicativo ao SharePoint
@@ -79,8 +96,9 @@ de níveis de acesso diferentes.
 
 ## Fluxo de autenticação: credenciais do cliente vs. autenticação delegada (usuário)
 
-Este projeto usa o fluxo OAuth 2.0 de **credenciais do cliente (client credentials)**, onde o aplicativo
-se autentica como ele mesmo (o registro de aplicativo) sem contexto de usuário:
+Este projeto suporta os fluxos OAuth 2.0 de **credenciais do cliente (client credentials)** e **autenticação delegada (authorization code)**. Em ambos os casos, o acesso aos dados do SharePoint continua restrito por `Sites.Selected` e por inscrição explícita de cada site.
+
+No fluxo de **credenciais do cliente**, o aplicativo se autentica como ele mesmo (o registro de aplicativo) sem contexto de usuário:
 
 - ✅ **Execução sem supervisão** — não é necessário login do usuário; adequado para trabalhos em lote, serviços em background ou tarefas agendadas.
 - ✅ **Configuração simples** — um único ID do cliente e segredo.
@@ -95,9 +113,9 @@ um usuário faz login interativamente:
 - ❌ **Requer interação do usuário** — o aplicativo não pode executar sem supervisão; alguém deve
   fazer login cada vez.
 
-Ambos os fluxos usam o mesmo modelo de permissão `Sites.Selected` e concedem o mesmo
-acesso ao conteúdo do SharePoint. A diferença é **quem o aplicativo representa**
-(ele mesmo vs. um usuário) e como essa identidade aparece nos logs de auditoria.
+Ambos os fluxos usam o mesmo modelo de permissão `Sites.Selected`, exigem inscrição explícita do site e evitam autorizações amplas no nível do tenant. A diferença é **quem o aplicativo representa** (ele mesmo vs. um usuário) e como essa identidade aparece nos logs de auditoria.
+
+No fluxo delegado, o acesso efetivo em runtime é a interseção entre: 1) a concessão `read` ou `write` dada ao aplicativo no site e 2) as permissões que o usuário autenticado já possui nesse mesmo site.
 
 Mudar para autenticação delegada requer:
 
