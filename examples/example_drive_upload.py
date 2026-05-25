@@ -6,11 +6,13 @@ Place a file at the LOCAL_FILE path (or change the variable), then run:
 """
 
 from pathlib import Path
+from requests import HTTPError
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from msgraphtest.drive import upload_file
+from msgraphtest.graph_client import format_http_error
 
 # ── Configuration ───────────────────────────────────────────────────────────
 # Path to the file you want to upload
@@ -20,7 +22,7 @@ REMOTE_FOLDER: str = "root"
 # ────────────────────────────────────────────────────────────────────────────
 
 
-def main() -> None:
+def main() -> int:
     """Upload a local file to the SharePoint drive.
 
     Creates a sample file if none exists, then uploads it to the configured
@@ -33,12 +35,23 @@ def main() -> None:
         print(f"Created sample file: {LOCAL_FILE}")
 
     print(f"Uploading {LOCAL_FILE.name} to drive folder '{REMOTE_FOLDER}'...")
-    result = upload_file(LOCAL_FILE, remote_folder=REMOTE_FOLDER)
+    try:
+        result = upload_file(LOCAL_FILE, remote_folder=REMOTE_FOLDER)
+    except HTTPError as exc:
+        print("\nUpload failed.")
+        print(f"  {format_http_error(exc)}")
+        return 1
+    except Exception as exc:
+        print("\nUpload failed due to an unexpected error.")
+        print(f"  {exc}")
+        return 1
+
     print(f"\nUpload successful!")
     print(f"  Item ID  : {result.get('id')}")
     print(f"  Name     : {result.get('name')}")
     print(f"  Web URL  : {result.get('webUrl')}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

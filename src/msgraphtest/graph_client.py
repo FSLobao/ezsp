@@ -16,6 +16,53 @@ from msgraphtest.auth import get_access_token
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 
 
+def format_http_error(error: requests.HTTPError) -> str:
+    """Return a clean, user-facing message for an HTTP error.
+
+    Extracts useful details from Microsoft Graph error payloads when present,
+    while still handling generic HTTP errors gracefully.
+    """
+    response = error.response
+    if response is None:
+        return f"HTTP error: {error}"
+
+    method = response.request.method if response.request else "HTTP"
+    url = response.url or "<unknown-url>"
+    status = response.status_code
+    reason = response.reason or ""
+    base = f"{method} {url} failed with {status} {reason}".strip()
+
+    detail = _extract_graph_error_detail(response)
+    if detail:
+        return f"{base}. Detail: {detail}"
+    return base
+
+
+def _extract_graph_error_detail(response: requests.Response) -> str | None:
+    """Extract Graph error code/message from an HTTP response, if available."""
+    try:
+        payload = response.json()
+    except ValueError:
+        text = response.text.strip()
+        return text or None
+
+    if not isinstance(payload, dict):
+        return None
+
+    error_obj = payload.get("error")
+    if isinstance(error_obj, dict):
+        code = str(error_obj.get("code", "")).strip()
+        message = str(error_obj.get("message", "")).strip()
+        if code and message:
+            return f"{code}: {message}"
+        if message:
+            return message
+        if code:
+            return code
+
+    return None
+
+
 class GraphClient:
     """Minimal Microsoft Graph API client (client credentials)."""
 
