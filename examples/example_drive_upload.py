@@ -16,7 +16,7 @@ load_dotenv()
 
 # ── Configuration ───────────────────────────────────────────────────────────
 # Path to the file you want to upload
-LOCAL_FILE: Path = Path(__file__).parent.parent / "downloads" / "sample_upload.txt"
+LOCAL_FILE: Path = Path(__file__).parent / "downloads" / "sample_upload.txt"
 # Target folder in the drive, e.g. "root:/Documents:" — defaults to drive root
 REMOTE_FOLDER: str = "root"
 # ────────────────────────────────────────────────────────────────────────────
