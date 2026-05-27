@@ -99,21 +99,39 @@ Siga a mesma inscrição por site descrita na Etapa 4 de [setup_portal.md](setup
 
 ---
 
-## Etapa 5 — Estado atual do pacote
+## Etapa 5 — Habilitar o modo delegado no pacote
 
 > 🔧 **Equipe de desenvolvimento**
 
-Este guia foi mantido apenas como referência do processo de configuração no tenant.
-A implementação Python antiga de autenticação delegada não faz mais parte da
-superfície atual do pacote `msgraphtest`.
+Com a configuração do tenant concluída nas etapas anteriores, configure o modo
+delegado via `.env`:
 
-Hoje, o pacote expõe o fluxo classe-first baseado em `GraphClient` e
-`GraphAuthenticator` para Microsoft Graph. Se você precisar manter um fluxo
-delegado em outro projeto, implemente-o em um módulo separado para não misturar
-com a API atual.
+```env
+GRAPH_AUTH_MODE=delegated
+AZURE_REDIRECT_URI=http://localhost
+GRAPH_DELEGATED_LOGIN_MODE=interactive
+# Opcional
+# GRAPH_DELEGATED_SCOPES=https://graph.microsoft.com/Sites.Selected offline_access openid profile
+```
 
-Para o estado atual do repositório, use os exemplos e notebooks já alinhados com
-a API class-based:
+Depois, execute um exemplo usando a API class-based:
+
+```bash
+uv run examples/example_delegated_site_contents.py
+```
+
+Você também pode usar o modo `device_code` (útil quando o redirect local não é
+viável):
+
+```env
+GRAPH_DELEGATED_LOGIN_MODE=device_code
+```
+
+Em modo delegado, o `GraphClient` e o `GraphAuthenticator` funcionam com a mesma
+superfície pública já usada no modo `client_credentials`; muda apenas a forma de
+obtenção do token.
+
+Exemplos adicionais ainda válidos:
 
 ```bash
 uv run examples/example_drive_list.py

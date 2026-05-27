@@ -72,15 +72,6 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceFolder}"
-        },
-        {
-            "name": "ArcGIS: DEM Tiles (API Key)",
-            "type": "python",
-            "request": "launch",
-            "module": "examples.example_arcgis_dem_tiles",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "cwd": "${workspaceFolder}"
         }
     ]
 }

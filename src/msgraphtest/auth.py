@@ -1,12 +1,14 @@
-"""MSAL client-credentials authentication helper.
+"""MSAL authentication helper for Microsoft Graph.
 
-Provides a class-based authenticator for Microsoft Graph using the OAuth 2.0
-client credentials flow (app-only).
+Supports two authentication modes:
+- client_credentials (app-only)
+- delegated (user-interactive)
 
-Required environment variables:
-    AZURE_TENANT_ID     - Azure AD tenant ID
-    AZURE_CLIENT_ID     - App registration client ID
-    AZURE_CLIENT_SECRET - App registration client secret
+Required environment variables depend on mode:
+    client_credentials:
+        AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+    delegated:
+        AZURE_TENANT_ID, AZURE_CLIENT_ID
 """
 
 import os
@@ -20,6 +22,13 @@ load_dotenv()
 
 GRAPH_SCOPES = ["https://graph.microsoft.com/.default"]
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
+DEFAULT_GRAPH_AUTH_MODE = "client_credentials"
+DELEGATED_GRAPH_SCOPES = [
+    "https://graph.microsoft.com/Sites.Selected",
+    "offline_access",
+    "openid",
+    "profile",
+]
 
 # Public API exported by this module.
 __all__ = ["GraphAuthorizationError", "GraphClient", "GraphAuthenticator"]
@@ -118,6 +127,7 @@ class GraphClient:
         token: str | None = None,
         authenticator: "GraphAuthenticator | None" = None,
         sharepoint_site_id: str | None = None,
+        auth_mode: str | None = None,
     ) -> None:
         """Initialize Graph client and ensure an attached GraphAuthenticator.
 
@@ -131,6 +141,7 @@ class GraphClient:
                 sharepoint_site_id=sharepoint_site_id,
                 token=token,
                 create_client=False,
+                auth_mode=auth_mode,
             )
         else:
             self.authenticator = authenticator
@@ -140,7 +151,9 @@ class GraphClient:
         self._token: str = (
             token
             or self.authenticator.token
-            or GraphAuthenticator._acquire_token_from_env_internal()
+            or GraphAuthenticator._acquire_token_from_env_internal(
+                auth_mode=self.authenticator.auth_mode
+            )
         )
         self.authenticator.token = self._token
 
@@ -235,12 +248,17 @@ class GraphAuthenticator:
         token: str | None = None,
         client: GraphClient | None = None,
         create_client: bool = True,
+        auth_mode: str | None = None,
     ) -> None:
         self.tenant_id: str = ""
         self.client_id: str = ""
         self.client_secret: str = ""
+        self.redirect_uri: str = ""
+        self.delegated_scopes: list[str] = []
+        self.delegated_login_mode: str = "interactive"
         self.token: str = ""
         self.sharepoint_site_id: str = ""
+        self.auth_mode = self._resolve_auth_mode(auth_mode)
 
         # Public site attributes populated at initialization time.
         self.site_data: dict = {}
@@ -289,6 +307,28 @@ class GraphAuthenticator:
         self.tenant_id = os.environ.get("AZURE_TENANT_ID", "")
         self.client_id = os.environ.get("AZURE_CLIENT_ID", "")
         self.client_secret = os.environ.get("AZURE_CLIENT_SECRET", "")
+        self.redirect_uri = os.environ.get("AZURE_REDIRECT_URI", "http://localhost")
+        self.delegated_login_mode = (
+            os.environ.get("GRAPH_DELEGATED_LOGIN_MODE", "interactive")
+            .strip()
+            .lower()
+            .replace("-", "_")
+        )
+        self.delegated_scopes = self._parse_delegated_scopes(
+            os.environ.get("GRAPH_DELEGATED_SCOPES", "")
+        )
+
+        if self.auth_mode == "delegated":
+            if not all([self.tenant_id, self.client_id]):
+                raise EnvironmentError(
+                    "Missing one or more required environment variables for delegated "
+                    "mode: AZURE_TENANT_ID, AZURE_CLIENT_ID"
+                )
+            if self.delegated_login_mode not in ("interactive", "device_code"):
+                raise EnvironmentError(
+                    "GRAPH_DELEGATED_LOGIN_MODE must be 'interactive' or 'device_code'"
+                )
+            return
 
         if not all([self.tenant_id, self.client_id, self.client_secret]):
             raise EnvironmentError(
@@ -297,6 +337,12 @@ class GraphAuthenticator:
             )
 
     def _acquire_token(self) -> str:
+        """Acquire and return a Graph API bearer token for the selected mode."""
+        if self.auth_mode == "delegated":
+            return self._acquire_token_delegated()
+        return self._acquire_token_client_credentials()
+
+    def _acquire_token_client_credentials(self) -> str:
         """Acquire and return a Graph API bearer token via client credentials."""
         result = self._acquire_access_token_result(
             tenant_id=self.tenant_id,
@@ -311,6 +357,30 @@ class GraphAuthenticator:
             error = result.get("error", "unknown")
             description = result.get("error_description", "")
             raise RuntimeError(f"Failed to acquire token: {error} - {description}")
+
+        return result["access_token"]
+
+    def _acquire_token_delegated(self) -> str:
+        """Acquire and return a Graph API bearer token via delegated login."""
+        result = self._acquire_access_token_result_delegated(
+            tenant_id=self.tenant_id,
+            client_id=self.client_id,
+            redirect_uri=self.redirect_uri,
+            scopes=self.delegated_scopes,
+            login_mode=self.delegated_login_mode,
+        )
+
+        if not isinstance(result, dict):
+            raise RuntimeError(
+                "Failed to acquire delegated token: invalid response from MSAL"
+            )
+
+        if "access_token" not in result:
+            error = result.get("error", "unknown")
+            description = result.get("error_description", "")
+            raise RuntimeError(
+                f"Failed to acquire delegated token: {error} - {description}"
+            )
 
         return result["access_token"]
 
@@ -381,10 +451,118 @@ class GraphAuthenticator:
         return result if isinstance(result, dict) else None
 
     @staticmethod
-    def _acquire_token_from_env_internal() -> str:
-        """Acquire and return a Graph token using only Azure env configuration."""
+    def _acquire_access_token_result_delegated(
+        tenant_id: str,
+        client_id: str,
+        redirect_uri: str,
+        scopes: list[str],
+        login_mode: str,
+    ) -> dict | None:
+        """Acquire token payload from Azure AD via delegated authentication."""
+        authority = f"https://login.microsoftonline.com/{tenant_id}"
+        app = msal.PublicClientApplication(
+            client_id=client_id,
+            authority=authority,
+        )
+
+        if login_mode == "device_code":
+            flow = app.initiate_device_flow(scopes=scopes)
+            if "user_code" not in flow:
+                return flow if isinstance(flow, dict) else None
+            print(flow.get("message", "Complete device authentication to continue."))
+            result = app.acquire_token_by_device_flow(flow)
+            return result if isinstance(result, dict) else None
+
+        result = app.acquire_token_interactive(
+            scopes=scopes,
+            redirect_uri=redirect_uri,
+        )
+        return result if isinstance(result, dict) else None
+
+    @staticmethod
+    def _resolve_auth_mode(auth_mode: str | None) -> str:
+        """Resolve auth mode from explicit argument or environment."""
+        resolved = auth_mode or os.environ.get(
+            "GRAPH_AUTH_MODE", DEFAULT_GRAPH_AUTH_MODE
+        )
+        normalized = resolved.strip().lower().replace("-", "_")
+
+        aliases = {
+            "app_only": "client_credentials",
+            "app": "client_credentials",
+            "client": "client_credentials",
+            "delegated": "delegated",
+            "user": "delegated",
+        }
+        mode = aliases.get(normalized, normalized)
+        if mode not in ("client_credentials", "delegated"):
+            raise ValueError(
+                "Unsupported GRAPH_AUTH_MODE. Use 'client_credentials' or 'delegated'."
+            )
+        return mode
+
+    @staticmethod
+    def _parse_delegated_scopes(raw_scopes: str) -> list[str]:
+        """Parse delegated scopes from env value or fallback to defaults."""
+        if not raw_scopes.strip():
+            return DELEGATED_GRAPH_SCOPES.copy()
+
+        scope_values = []
+        for part in raw_scopes.replace(",", " ").split():
+            value = part.strip()
+            if value and value not in scope_values:
+                scope_values.append(value)
+        return scope_values or DELEGATED_GRAPH_SCOPES.copy()
+
+    @staticmethod
+    def _acquire_token_from_env_internal(auth_mode: str | None = None) -> str:
+        """Acquire and return a Graph token using only environment configuration."""
+        resolved_auth_mode = GraphAuthenticator._resolve_auth_mode(auth_mode)
         tenant_id = os.environ.get("AZURE_TENANT_ID", "")
         client_id = os.environ.get("AZURE_CLIENT_ID", "")
+        if resolved_auth_mode == "delegated":
+            if not all([tenant_id, client_id]):
+                raise EnvironmentError(
+                    "Missing one or more required environment variables for delegated "
+                    "mode: AZURE_TENANT_ID, AZURE_CLIENT_ID"
+                )
+
+            redirect_uri = os.environ.get("AZURE_REDIRECT_URI", "http://localhost")
+            delegated_login_mode = (
+                os.environ.get("GRAPH_DELEGATED_LOGIN_MODE", "interactive")
+                .strip()
+                .lower()
+                .replace("-", "_")
+            )
+            if delegated_login_mode not in ("interactive", "device_code"):
+                raise EnvironmentError(
+                    "GRAPH_DELEGATED_LOGIN_MODE must be 'interactive' or 'device_code'"
+                )
+
+            delegated_scopes = GraphAuthenticator._parse_delegated_scopes(
+                os.environ.get("GRAPH_DELEGATED_SCOPES", "")
+            )
+            result = GraphAuthenticator._acquire_access_token_result_delegated(
+                tenant_id=tenant_id,
+                client_id=client_id,
+                redirect_uri=redirect_uri,
+                scopes=delegated_scopes,
+                login_mode=delegated_login_mode,
+            )
+            if not isinstance(result, dict):
+                raise RuntimeError(
+                    "Failed to acquire delegated token: invalid response from MSAL"
+                )
+
+            if "access_token" not in result:
+                error = result.get("error", "unknown")
+                description = result.get("error_description", "")
+                raise RuntimeError(
+                    f"Failed to acquire delegated token: {error} - {description}"
+                )
+
+            return result["access_token"]
+
         client_secret = os.environ.get("AZURE_CLIENT_SECRET", "")
         if not all([tenant_id, client_id, client_secret]):
             raise EnvironmentError(

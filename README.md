@@ -161,11 +161,20 @@ Variáveis obrigatórias em `.env`:
 | `SHAREPOINT_DRIVE_ID` | ID da drive (unidade) da biblioteca de documentos |
 | `SHAREPOINT_LIST_ID` | ID da lista para operações de lista |
 
+Variáveis opcionais para modo de autenticação:
+
+| Variável | Descrição |
+|---|---|
+| `GRAPH_AUTH_MODE` | Modo de autenticação (`client_credentials` ou `delegated`) |
+| `AZURE_REDIRECT_URI` | URI de redirecionamento para login interativo em modo `delegated` |
+| `GRAPH_DELEGATED_LOGIN_MODE` | `interactive` (browser local) ou `device_code` |
+| `GRAPH_DELEGATED_SCOPES` | Escopos delegados (separados por espaço ou vírgula) |
+
 > **Encontrando IDs** — veja [docs/getting_started.md](docs/getting_started.md).
 
 ### 3. Escolher o modelo de autenticação
 
-- **`app_only`**: indicado para automação sem interação do usuário.
+- **`client_credentials`** (alias: `app_only`): indicado para automação sem interação do usuário.
 - **`delegated`**: indicado quando é necessário associar as ações a um usuário autenticado.
 
 Nos dois casos, o projeto usa `Sites.Selected` e exige inscrição explícita do site.

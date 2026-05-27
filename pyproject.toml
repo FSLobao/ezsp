@@ -10,7 +10,6 @@ dependencies = [
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
     "pandas>=2.2.0",
-    "arcgis>=2.4.3",
 ]
 
 [dependency-groups]
@@ -25,11 +24,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/msgraphtest", "src/arcgisTest"]
+packages = ["src/msgraphtest"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=src/msgraphtest --cov-report=term-missing"
 
 [tool.coverage.run]
-source = ["src/msgraphtest", "src/arcgisTest"]
+source = ["src/msgraphtest"]

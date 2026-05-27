@@ -35,7 +35,6 @@ No fluxo `delegated`, o acesso efetivo em runtime continua sendo a interseção 
 - `msal`
 - `pandas`
 - `python-dotenv`
-- `arcgis` para os exemplos e notebooks de ArcGIS
 
 ---
 
@@ -54,11 +53,9 @@ MSGraphTest/
 │   ├── example_list_get.py
 │   ├── example_list_update.py
 │   ├── example_site_contents.py
-│   └── example_arcgis_dem_tiles.py
 ├── notebooks/
 │   └── graph_auth_site_attributes.ipynb
 ├── src/
-│   ├── arcgisTest/
 │   ├── bulkCreate/
 │   └── msgraphtest/
 │       ├── __init__.py
@@ -93,14 +90,6 @@ MSGraphTest/
 - `GraphList.get_list_items(select=None, include_title=False, fields_only=False, include_item_id=False)`
 - `GraphList.create_list_item(fields)`
 - `GraphList.update_list_item(item_id, fields)`
-
----
-
-## ArcGIS
-
-- `src/arcgisTest/` contém helpers reutilizáveis para autenticação e acesso a ImageServer/WMS.
-- `examples/example_arcgis_dem_tiles.py` mostra o uso desses helpers.
-- `notebooks/arcgis_auth_testing.ipynb` e `notebooks/arcgis_http_testing.ipynb` validam os fluxos de forma interativa.
 
 ---
 
@@ -141,4 +130,4 @@ Preferências do projeto:
 ## Última Atualização
 
 - Data: 26/05/2026
-- Alteração principal: remoção dos wrappers legados, consolidação da API em classes, atualização dos exemplos/notebooks e inclusão dos helpers ArcGIS.
+- Alteração principal: remoção dos wrappers legados, consolidação da API em classes e atualização dos exemplos/notebooks.
