@@ -35,148 +35,81 @@ Licenciado sob a [GNU General Public License v3.0](LICENSE).
 
 ## Estrutura do projeto
 
-Escolha a visualização que preferir. Esta seção traz 3 alternativas para comparar renderização e legibilidade.
-
-### Opção 1: Árvore textual (formato atual)
-
-```
-MSGraphTest/
-├── src/
-│   ├── bulkCreate/
-│   │   ├── bulk_create_apps.py        # utilitário para criar múltiplas apps em lote (Python)
-│   │   └── Bulk-CreateApps.ps1        # idem, versão PowerShell
-│   └── msgraphtest/
-│       ├── __init__.py                # ponto de entrada do pacote
-│       ├── auth.py                    # GraphClient + GraphAuthenticator
-│       ├── drive.py                   # operações de biblioteca de documentos
-│       └── lists.py                   # operações de lista do SharePoint
-├── tests/
-│   ├── test_auth.py
-│   ├── test_drive.py
-│   └── test_lists.py
-├── examples/
-│   ├── example_drive_list.py          # listar conteúdo raiz da drive
-│   ├── example_drive_download.py      # baixar arquivo para pasta local
-│   ├── example_drive_upload.py        # enviar arquivo local
-│   ├── example_drive_read_write.py    # ler e atualizar conteúdo de texto do arquivo
-│   ├── example_list_get.py            # recuperar todos os itens de lista
-│   ├── example_list_create.py         # criar item de lista
-│   ├── example_list_update.py         # atualizar item de lista
-│   └── bulk_create_example.json       # modelo de entrada para bulk_create_apps
-├── notebooks/
-│   └── graph_auth_site_attributes.ipynb  # fluxo interativo end-to-end (auth + drive + lists)
-├── docs/
-│   ├── getting_started.md             # guia de início rápido
-│   ├── setup_cli.md                   # setup com Azure CLI / PowerShell
-│   ├── setup_portal.md                # setup com Azure Portal
-│   ├── setup_delegated_auth.md        # setup com autenticação delegada (usuário)
-│   └── bulk_create_apps.md            # documentação de criação em lote de apps
-├── downloads/                 # (ignorado por git) destino de download local
-├── .env.example               # copie para .env e preencha as credenciais
-├── pyproject.toml
-└── LICENSE
-```
-
-### Opção 2: Tabela estruturada (nome e descrição separados)
-
-| Caminho | Tipo | Descrição |
-|---|---|---|
-| src/bulkCreate/bulk_create_apps.py | Script Python | Utilitário para criar múltiplas apps em lote |
-| src/bulkCreate/Bulk-CreateApps.ps1 | Script PowerShell | Utilitário equivalente em PowerShell |
-| src/msgraphtest/__init__.py | Módulo | Ponto de entrada do pacote |
-| src/msgraphtest/auth.py | Módulo | GraphClient + GraphAuthenticator |
-| src/msgraphtest/drive.py | Módulo | Operações de biblioteca de documentos |
-| src/msgraphtest/lists.py | Módulo | Operações de lista do SharePoint |
-| tests/ | Diretório | Testes automatizados |
-| examples/ | Diretório | Exemplos executáveis de uso |
-| notebooks/graph_auth_site_attributes.ipynb | Notebook | Fluxo interativo end-to-end (auth + drive + lists) |
-| docs/ | Diretório | Guias e documentação de setup |
-| downloads/ | Diretório | Destino de downloads locais (ignorado por git) |
-| .env.example | Arquivo de configuração | Modelo para variáveis de ambiente |
-| pyproject.toml | Arquivo de projeto | Dependências e configuração Python |
-| LICENSE | Licença | GPL v3.0 |
-
-### Opção 3: Estrutura HTML colapsável
+Este repositório apresenta a seguinte organização:
 
 <details>
-	<summary><strong>Expandir estrutura por grupos</strong></summary>
-
-	<details>
-		<summary><strong>src/</strong> - codigo-fonte principal</summary>
-
-		<details>
-			<summary><strong>bulkCreate/</strong> - criacao de apps em lote</summary>
-			<ul>
-				<li><code>bulk_create_apps.py</code> - criacao em lote (Python)</li>
-				<li><code>Bulk-CreateApps.ps1</code> - criacao em lote (PowerShell)</li>
-			</ul>
-		</details>
-
-		<details>
-			<summary><strong>msgraphtest/</strong> - modulos de Graph e SharePoint</summary>
-			<ul>
-				<li><code>__init__.py</code> - ponto de entrada do pacote</li>
-				<li><code>auth.py</code> - cliente e autenticador Graph</li>
-				<li><code>drive.py</code> - operacoes de drive</li>
-				<li><code>lists.py</code> - operacoes de listas</li>
-			</ul>
-		</details>
-	</details>
-
-	<details>
-		<summary><strong>tests/</strong> - testes automatizados</summary>
-		<ul>
-			<li><code>test_auth.py</code></li>
-			<li><code>test_drive.py</code></li>
-			<li><code>test_lists.py</code></li>
-		</ul>
-	</details>
-
-	<details>
-		<summary><strong>examples/</strong> - scripts de exemplo</summary>
-		<ul>
-			<li><code>example_drive_list.py</code></li>
-			<li><code>example_drive_download.py</code></li>
-			<li><code>example_drive_upload.py</code></li>
-			<li><code>example_drive_read_write.py</code></li>
-			<li><code>example_list_get.py</code></li>
-			<li><code>example_list_create.py</code></li>
-			<li><code>example_list_update.py</code></li>
-			<li><code>bulk_create_example.json</code></li>
-		</ul>
-	</details>
-
-	<details>
-		<summary><strong>notebooks/</strong> - testes interativos</summary>
-		<ul>
-			<li><code>graph_auth_site_attributes.ipynb</code></li>
-		</ul>
-	</details>
-
-	<details>
-		<summary><strong>docs/</strong> - documentacao adicional</summary>
-		<ul>
-			<li><code>getting_started.md</code></li>
-			<li><code>setup_cli.md</code></li>
-			<li><code>setup_portal.md</code></li>
-			<li><code>setup_delegated_auth.md</code></li>
-			<li><code>bulk_create_apps.md</code></li>
-		</ul>
-	</details>
-
-	<details>
-		<summary><strong>downloads/</strong> - artefatos locais (gitignored)</summary>
-		<ul>
-			<li>Arquivos de download e upload de teste gerados localmente</li>
-		</ul>
-	</details>
-
+	<summary><strong>src/</strong>: codigo-fonte principal do pacote e scripts utilitarios</summary>
 	<ul>
-		<li><code>.env.example</code> - modelo de configuracao</li>
-		<li><code>pyproject.toml</code> - configuracao do projeto</li>
-		<li><code>LICENSE</code> - licenca do repositorio</li>
+		<li><strong>bulkCreate/</strong>: automacao de criacao em lote de aplicacoes no Entra ID
+			<ul>
+				<li><code>bulk_create_apps.py</code>: script Python para provisionar apps e permissoes de forma padronizada</li>
+				<li><code>Bulk-CreateApps.ps1</code>: alternativa PowerShell para execucao operacional em ambientes Windows</li>
+			</ul>
+		</li>
+		<li><strong>msgraphtest/</strong>: implementacao do cliente Graph e operacoes de SharePoint
+			<ul>
+				<li><code>__init__.py</code>: ponto de entrada do pacote para importacoes publicas</li>
+				<li><code>auth.py</code>: autenticacao (app_only/delegated), sessao HTTP e descoberta de metadados do site</li>
+				<li><code>drive.py</code>: listagem, upload, download e leitura/escrita de conteudo em bibliotecas de documentos</li>
+				<li><code>lists.py</code>: consulta de colunas/views e operacoes de create/update em itens de lista</li>
+			</ul>
+		</li>
 	</ul>
 </details>
+
+<details>
+	<summary><strong>tests/</strong>: testes automatizados de unidade e comportamento</summary>
+	<ul>
+		<li><code>test_auth.py</code>: validacao dos fluxos de autenticacao e descoberta de site</li>
+		<li><code>test_drive.py</code>: cobertura das operacoes de arquivos e bibliotecas</li>
+		<li><code>test_lists.py</code>: cobertura das operacoes em listas e itens</li>
+	</ul>
+</details>
+
+<details>
+	<summary><strong>examples/</strong>: scripts de referencia para execucao rapida por caso de uso</summary>
+	<ul>
+		<li><code>example_drive_list.py</code>: demonstra listagem de itens no drive do site</li>
+		<li><code>example_drive_download.py</code>: exemplo de download de arquivo remoto para disco local</li>
+		<li><code>example_drive_upload.py</code>: exemplo de upload de arquivo local para o SharePoint</li>
+		<li><code>example_drive_read_write.py</code>: leitura e sobrescrita de conteudo textual de arquivo</li>
+		<li><code>example_list_get.py</code>: consulta de itens de lista para analise e validacao</li>
+		<li><code>example_list_create.py</code>: criacao de novos itens em lista SharePoint</li>
+		<li><code>example_list_update.py</code>: atualizacao de campos em itens existentes</li>
+		<li><code>bulk_create_example.json</code>: modelo de entrada para o fluxo de criacao em lote</li>
+	</ul>
+</details>
+
+<details>
+	<summary><strong>notebooks/</strong>: validacao interativa passo a passo em ambiente exploratorio</summary>
+	<ul>
+		<li><code>graph_auth_site_attributes.ipynb</code>: roteiro end-to-end para autenticar, inspecionar site e testar edicao de conteudo</li>
+	</ul>
+</details>
+
+<details>
+	<summary><strong>docs/</strong>: guias de configuracao, operacao e referencia do projeto</summary>
+	<ul>
+		<li><code>getting_started.md</code>: visao geral do fluxo, prerequisitos e primeiros testes</li>
+		<li><code>setup_cli.md</code>: configuracao do ambiente usando Azure CLI e PowerShell</li>
+		<li><code>setup_portal.md</code>: configuracao manual no portal do Azure</li>
+		<li><code>setup_delegated_auth.md</code>: orientacoes para autenticacao delegada com usuario</li>
+		<li><code>bulk_create_apps.md</code>: detalhes do processo de provisionamento em lote</li>
+	</ul>
+</details>
+
+<details>
+	<summary><strong>downloads/</strong>: artefatos locais de teste (diretorio ignorado no git)</summary>
+	<ul>
+		<li>Armazena downloads, uploads de teste e arquivos temporarios gerados nas validacoes</li>
+	</ul>
+</details>
+
+<ul>
+	<li><code>.env.example</code>: modelo de configuracao de ambiente para armazenamento de tokens e senhas</li>
+	<li><code>pyproject.toml</code>: manifesto do projeto com dependencias, metadados e configuracoes de ferramentas</li>
+	<li><code>LICENSE</code>: termos de licenciamento do repositorio sob GPL v3.0</li>
+</ul>
 
 [⬆ Voltar ao topo](#topo)
 
