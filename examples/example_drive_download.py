@@ -2,7 +2,7 @@
 example_drive_download.py — Download a file from SharePoint to a local folder.
 
 Set ITEM_ID below to the drive item ID of the file you want to download.
-The file will be saved to the downloads/ folder next to this script.
+The file will be saved to the examples/downloads/ folder.
 
 Usage:
     uv run examples/example_drive_download.py
@@ -19,7 +19,7 @@ from msgraphtest.drive import GraphDrive
 # ── Configuration ───────────────────────────────────────────────────────────
 # Replace with a real drive item ID, or leave empty to use the first file found
 ITEM_ID: str = ""
-LOCAL_FOLDER: Path = Path(__file__).parent.parent / "downloads"
+LOCAL_FOLDER: Path = Path(__file__).parent / "downloads"
 # ────────────────────────────────────────────────────────────────────────────
 
 
@@ -27,7 +27,7 @@ def main() -> None:
     """Download a file from the SharePoint drive to the local filesystem.
 
     If ITEM_ID is not set, downloads the first file found in the drive root.
-    Saved files are placed in the downloads/ folder.
+    Saved files are placed in examples/downloads/.
     """
     client = GraphClient()
     drive = GraphDrive(client=client)
