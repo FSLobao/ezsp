@@ -23,11 +23,14 @@ load_dotenv()
 GRAPH_SCOPES = ["https://graph.microsoft.com/.default"]
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 DEFAULT_GRAPH_AUTH_MODE = "client_credentials"
+# Reserved OIDC scopes (openid, profile, offline_access) are added automatically
+# by MSAL for interactive and device_code flows. Passing them explicitly raises
+# a ValueError, so they must not appear in the scopes list we submit.
+_MSAL_RESERVED_SCOPES: frozenset[str] = frozenset(
+    ["openid", "profile", "offline_access"]
+)
 DELEGATED_GRAPH_SCOPES = [
     "https://graph.microsoft.com/Sites.Selected",
-    "offline_access",
-    "openid",
-    "profile",
 ]
 
 # Public API exported by this module.
@@ -365,9 +368,9 @@ class GraphAuthenticator:
         result = self._acquire_access_token_result_delegated(
             tenant_id=self.tenant_id,
             client_id=self.client_id,
-            redirect_uri=self.redirect_uri,
             scopes=self.delegated_scopes,
             login_mode=self.delegated_login_mode,
+            redirect_uri=self.redirect_uri,
         )
 
         if not isinstance(result, dict):
@@ -454,11 +457,19 @@ class GraphAuthenticator:
     def _acquire_access_token_result_delegated(
         tenant_id: str,
         client_id: str,
-        redirect_uri: str,
         scopes: list[str],
         login_mode: str,
+        redirect_uri: str = "http://localhost",
     ) -> dict | None:
-        """Acquire token payload from Azure AD via delegated authentication."""
+        """Acquire token payload from Azure AD via delegated authentication.
+
+        MSAL 1.x uses a ``port`` integer parameter (not ``redirect_uri``) for
+        acquire_token_interactive.  The port is extracted from ``redirect_uri``
+        when it contains one (e.g. "http://localhost:8356" → 8356); otherwise
+        MSAL picks a random available port.
+        """
+        from urllib.parse import urlparse
+
         authority = f"https://login.microsoftonline.com/{tenant_id}"
         app = msal.PublicClientApplication(
             client_id=client_id,
@@ -473,10 +484,9 @@ class GraphAuthenticator:
             result = app.acquire_token_by_device_flow(flow)
             return result if isinstance(result, dict) else None
 
-        result = app.acquire_token_interactive(
-            scopes=scopes,
-            redirect_uri=redirect_uri,
-        )
+        parsed = urlparse(redirect_uri)
+        port: int | None = parsed.port  # None when no port is specified
+        result = app.acquire_token_interactive(scopes=scopes, port=port)
         return result if isinstance(result, dict) else None
 
     @staticmethod
@@ -503,14 +513,23 @@ class GraphAuthenticator:
 
     @staticmethod
     def _parse_delegated_scopes(raw_scopes: str) -> list[str]:
-        """Parse delegated scopes from env value or fallback to defaults."""
+        """Parse delegated scopes from env value or fallback to defaults.
+
+        Reserved OIDC scopes (openid, profile, offline_access) are silently
+        dropped because MSAL adds them automatically; passing them explicitly
+        raises a ValueError.
+        """
         if not raw_scopes.strip():
             return DELEGATED_GRAPH_SCOPES.copy()
 
         scope_values = []
         for part in raw_scopes.replace(",", " ").split():
             value = part.strip()
-            if value and value not in scope_values:
+            if (
+                value
+                and value not in scope_values
+                and value not in _MSAL_RESERVED_SCOPES
+            ):
                 scope_values.append(value)
         return scope_values or DELEGATED_GRAPH_SCOPES.copy()
 
@@ -545,9 +564,9 @@ class GraphAuthenticator:
             result = GraphAuthenticator._acquire_access_token_result_delegated(
                 tenant_id=tenant_id,
                 client_id=client_id,
-                redirect_uri=redirect_uri,
                 scopes=delegated_scopes,
                 login_mode=delegated_login_mode,
+                redirect_uri=redirect_uri,
             )
             if not isinstance(result, dict):
                 raise RuntimeError(
