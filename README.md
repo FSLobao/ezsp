@@ -52,6 +52,9 @@ Este repositório apresenta a seguinte organização:
 				<li><code>__init__.py</code>: ponto de entrada do pacote para importacoes publicas</li>
 				<li><code>auth.py</code>: autenticacao MSAL (app_only/delegated) — valida credenciais e adquire tokens</li>
 				<li><code>client.py</code>: ponto de entrada principal — le .env, gerencia sessao HTTP e descoberta do site</li>
+				<li><code>settings.py</code>: defaults centralizados e resolucao de configuracao (argumento -> env -> default)</li>
+				<li><code>messages.py</code>: carregamento de mensagens para usuario por locale com fallback para ingles</li>
+				<li><code>locales/en.json</code> e <code>locales/pt.json</code>: bundles de localizacao usados por <code>messages.py</code></li>
 				<li><code>drive.py</code>: listagem, upload, download e leitura/escrita de conteudo em bibliotecas de documentos</li>
 				<li><code>lists.py</code>: consulta de colunas/views, validacao tipada e operacoes de create/update em itens de lista</li>
 			</ul>
@@ -177,6 +180,10 @@ Variáveis opcionais (possuem valor default):
 | `SHAREPOINT_DRIVE_ID` | — | ID da biblioteca de documentos (necessário para `GraphDrive`) |
 | `SHAREPOINT_LIST_ID` | — | ID da lista SharePoint (necessário para `GraphList`) |
 
+Defaults e resolucao dessas variaveis ficam centralizados em `src/msgraphclient/settings.py`.
+Mensagens para usuario sao resolvidas em `src/msgraphclient/messages.py`, com bundles em
+`src/msgraphclient/locales/en.json` e `src/msgraphclient/locales/pt.json`.
+
 Consulte [`.env.example`](.env.example) para um modelo completo com explicações detalhadas.
 
 > **Encontrando IDs** — veja [docs/getting_started.md](docs/getting_started.md).
@@ -260,7 +267,7 @@ requerem credenciais reais.
 Para criar múltiplas aplicações Azure AD com credenciais automaticamente:
 
 - **PowerShell (recomendado)**: `.\src/bulkCreate/Bulk-CreateApps.ps1 -InputPath config.json`
-- **Python**: `python -m bulkCreate.bulk_create_apps config.json`
+- **Python**: `uv run python -m bulkCreate.bulk_create_apps config.json`
 
 Autentique uma vez e execute múltiplas vezes com `-SkipLogin` (PowerShell) ou `--skip-login` (Python).
 Use [examples/bulk_create_example.json](examples/bulk_create_example.json) como modelo e
@@ -305,6 +312,16 @@ Recebe credenciais explícitas (não lê `.env`) e adquire tokens OAuth 2.0
 via fluxo de credenciais do cliente ou fluxo delegado interativo.
 
 Para o fluxo delegado, veja [docs/setup_delegated_auth.md](docs/setup_delegated_auth.md).
+
+### `settings.py`
+`GraphSettings` e `GraphDefaults` centralizam defaults e normalizacao de
+configuracao, evitando valores hardcoded espalhados entre modulos.
+
+### `messages.py` e `locales/*.json`
+`messages.py` resolve strings voltadas ao usuario via `GRAPH_LOCALE`.
+Os bundles ficam em `src/msgraphclient/locales/en.json` e
+`src/msgraphclient/locales/pt.json`, com fallback para ingles quando
+locale/chave nao existe.
 
 ### `drive.py`
 Operações de biblioteca de documentos. Requer `drive_id` explícito na construção.
