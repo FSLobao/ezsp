@@ -11,8 +11,8 @@ Usage:
 from pathlib import Path
 
 
-from python.auth import GraphClient
-from python.drive import GraphDrive
+from msgraphclient.auth import GraphClient
+from msgraphclient.drive import GraphDrive
 
 # ── Configuration ───────────────────────────────────────────────────────────
 # Replace with a real drive item ID, or leave empty to use the first file found
@@ -29,6 +29,7 @@ def main() -> None:
     """
     client = GraphClient()
     import os
+
     drive_id = os.environ["SHAREPOINT_DRIVE_ID"]
     drive = GraphDrive(drive_id=drive_id, client=client)
 

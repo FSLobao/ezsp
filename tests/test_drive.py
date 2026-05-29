@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import python.drive as drive_mod
+import msgraphclient.drive as drive_mod
 
 
 @pytest.fixture()

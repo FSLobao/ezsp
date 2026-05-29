@@ -10,7 +10,7 @@ Expected .env settings:
     AZURE_CLIENT_ID=...
 """
 
-from python.auth import GraphClient, GraphAuthorizationError
+from msgraphclient.auth import GraphClient, GraphAuthorizationError
 
 
 def main() -> None:

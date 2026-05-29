@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 if TYPE_CHECKING:
-    from python.auth import GraphAuthenticator
+    from msgraphclient.auth import GraphAuthenticator
 
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 
@@ -126,8 +126,8 @@ class GraphClient:
             sharepoint_site_id: Optional site id (overrides env).
             auth_mode: Optional auth mode override (client_credentials | delegated).
         """
-        # Lazy import breaks the circular dependency with python.auth.
-        from python.auth import GraphAuthenticator as _GraphAuthenticator
+        # Lazy import breaks the circular dependency with msgraphclient.auth.
+        from msgraphclient.auth import GraphAuthenticator as _GraphAuthenticator
 
         if authenticator is None:
             tenant_id = os.environ.get("AZURE_TENANT_ID", "")

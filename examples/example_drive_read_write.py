@@ -10,9 +10,8 @@ Usage:
 import os
 
 
-
-from python.auth import GraphClient
-from python.drive import GraphDrive
+from msgraphclient.auth import GraphClient
+from msgraphclient.drive import GraphDrive
 
 # ── Configuration ───────────────────────────────────────────────────────────
 # Set DRIVE_ITEM_ID in .env with a real drive item ID for a text file
@@ -28,6 +27,7 @@ def main() -> None:
     """
     client = GraphClient()
     import os
+
     drive_id = os.environ["SHAREPOINT_DRIVE_ID"]
     drive = GraphDrive(drive_id=drive_id, client=client)
 

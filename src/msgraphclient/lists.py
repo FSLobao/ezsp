@@ -29,8 +29,8 @@ import pandas as pd
 import requests
 from dateutil import parser as dateutil_parser
 
-from python.auth import GraphClient
-from python.client import GRAPH_BASE_URL
+from msgraphclient.auth import GraphClient
+from msgraphclient.client import GRAPH_BASE_URL
 
 
 class GraphList:

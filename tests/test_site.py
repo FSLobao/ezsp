@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import python.auth as auth_mod
-from python.client import GraphClient
+import msgraphclient.auth as auth_mod
+from msgraphclient.client import GraphClient
 
 
 def test_get_site_contents_combines_site_drives_lists(

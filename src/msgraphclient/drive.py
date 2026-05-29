@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from python.auth import GraphClient
+from msgraphclient.auth import GraphClient
 
 
 class GraphDrive:

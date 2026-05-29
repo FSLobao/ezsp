@@ -5,7 +5,7 @@ Usage:
     uv run examples/example_site_contents.py
 """
 
-from python.auth import GraphClient
+from msgraphclient.auth import GraphClient
 
 
 def main() -> None:

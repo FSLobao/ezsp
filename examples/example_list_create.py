@@ -9,8 +9,8 @@ Usage:
 
 import os
 
-from python.auth import GraphClient
-from python.lists import GraphList
+from msgraphclient.auth import GraphClient
+from msgraphclient.lists import GraphList
 
 # ── Configuration ───────────────────────────────────────────────────────────
 # Adjust these fields to match your list's columns

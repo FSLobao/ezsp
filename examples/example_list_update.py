@@ -14,8 +14,8 @@ from numbers import Real
 from typing import Any
 
 
-from python.auth import GraphClient
-from python.lists import GraphList
+from msgraphclient.auth import GraphClient
+from msgraphclient.lists import GraphList
 
 
 # Set to the ID of the item to update, or leave empty to update the first item.

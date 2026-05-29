@@ -7,9 +7,8 @@ Usage:
 
 from requests import HTTPError
 
-from python.auth import GraphClient
-from python.lists import GraphList
-
+from msgraphclient.auth import GraphClient
+from msgraphclient.lists import GraphList
 
 
 def _prompt_view_selection(views: list[dict]) -> dict | None:
@@ -56,9 +55,7 @@ def main() -> None:
             f"Usando colunas configuradas via SHAREPOINT_VIEW_COLUMNS: {internal_names}\n"
         )
         try:
-            filtered_columns = list_client.get_columns(
-                names=["Title", *internal_names]
-            )
+            filtered_columns = list_client.get_columns(names=["Title", *internal_names])
         except HTTPError as exc:
             print(
                 "  Aviso: não foi possível resolver display names das colunas "
@@ -134,4 +131,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -12,7 +12,7 @@ import os
 
 import msal
 
-from python.client import GraphAuthorizationError, GraphClient  # noqa: F401
+from msgraphclient.client import GraphAuthorizationError, GraphClient  # noqa: F401
 
 GRAPH_SCOPES = ["https://graph.microsoft.com/.default"]
 DEFAULT_GRAPH_AUTH_MODE = "client_credentials"
@@ -27,7 +27,7 @@ DELEGATED_GRAPH_SCOPES = [
 ]
 
 # Public API exported by this module.
-# GraphAuthorizationError and GraphClient are re-exported from python.client.
+# GraphAuthorizationError and GraphClient are re-exported from msgraphclient.client.
 __all__ = ["GraphAuthorizationError", "GraphClient", "GraphAuthenticator"]
 
 

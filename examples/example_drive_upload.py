@@ -8,8 +8,8 @@ Place a file at the LOCAL_FILE path (or change the variable), then run:
 from pathlib import Path
 from requests import HTTPError
 
-from python.auth import GraphClient
-from python.drive import GraphDrive
+from msgraphclient.auth import GraphClient
+from msgraphclient.drive import GraphDrive
 
 
 # ── Configuration ───────────────────────────────────────────────────────────
@@ -28,6 +28,7 @@ def main() -> int:
     """
     client = GraphClient()
     import os
+
     drive_id = os.environ["SHAREPOINT_DRIVE_ID"]
     drive = GraphDrive(drive_id=drive_id, client=client)
 

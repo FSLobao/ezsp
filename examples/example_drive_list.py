@@ -5,9 +5,8 @@ Usage:
     uv run examples/example_drive_list.py
 """
 
-from python.auth import GraphClient
-from python.drive import GraphDrive
-
+from msgraphclient.auth import GraphClient
+from msgraphclient.drive import GraphDrive
 
 
 def main() -> None:
@@ -17,6 +16,7 @@ def main() -> None:
     """
     client = GraphClient()
     import os
+
     drive_id = os.environ["SHAREPOINT_DRIVE_ID"]
     drive = GraphDrive(drive_id=drive_id, client=client)
 
