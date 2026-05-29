@@ -182,13 +182,36 @@ class GraphAuthenticator:
             self._validate_credentials()
             self.token = self._acquire_token()
 
+    @staticmethod
+    def _env_file_location() -> str:
+        """Return the expected .env file path (cwd-based, as loaded by dotenv)."""
+        return os.path.join(os.getcwd(), ".env")
+
     def _validate_credentials(self) -> None:
         """Validate that required credentials are present for the selected mode."""
+        env_path = self._env_file_location()
+        docs_url = "https://github.com/FSLobao/MSGraphClient/wiki/Configuration"
+        repo_url = "https://github.com/FSLobao/MSGraphClient"
+
         if self.auth_mode == "delegated":
-            if not all([self.tenant_id, self.client_id]):
+            missing = [
+                v
+                for v, val in [
+                    ("AZURE_TENANT_ID", self.tenant_id),
+                    ("AZURE_CLIENT_ID", self.client_id),
+                ]
+                if not val
+            ]
+            if missing:
                 raise EnvironmentError(
-                    "Missing one or more required environment variables for delegated "
-                    "mode: AZURE_TENANT_ID, AZURE_CLIENT_ID"
+                    f"Variáveis de ambiente não encontradas: {', '.join(missing)}\n"
+                    f"\n"
+                    f"O modo delegado requer configuração adicional além das\n"
+                    f"credenciais básicas (redirect URI, scopes, login mode).\n"
+                    f"Consulte a documentação e o repositório da biblioteca:\n"
+                    f"\n"
+                    f"  Docs: {docs_url}\n"
+                    f"  Repo: {repo_url}\n"
                 )
             if self.delegated_login_mode not in ("interactive", "device_code"):
                 raise EnvironmentError(
@@ -196,10 +219,34 @@ class GraphAuthenticator:
                 )
             return
 
-        if not all([self.tenant_id, self.client_id, self.client_secret]):
+        missing = [
+            v
+            for v, val in [
+                ("AZURE_TENANT_ID", self.tenant_id),
+                ("AZURE_CLIENT_ID", self.client_id),
+                ("AZURE_CLIENT_SECRET", self.client_secret),
+            ]
+            if not val
+        ]
+        if missing:
             raise EnvironmentError(
-                "Missing one or more required environment variables: "
-                "AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET"
+                f"Variáveis de ambiente não encontradas: {', '.join(missing)}\n"
+                f"\n"
+                f"Crie um arquivo .env no diretório do seu projeto:\n"
+                f"  {env_path}\n"
+                f"\n"
+                f"Exemplo mínimo para autenticação client_credentials:\n"
+                f"\n"
+                f"  AZURE_TENANT_ID=seu-tenant-id\n"
+                f"  AZURE_CLIENT_ID=seu-client-id\n"
+                f"  AZURE_CLIENT_SECRET=seu-client-secret\n"
+                f"  SHAREPOINT_SITE_ID=seu-site-id\n"
+                f"\n"
+                f"Para autenticação em modo delegado, variáveis adicionais\n"
+                f"são necessárias. Consulte a documentação e o repositório:\n"
+                f"\n"
+                f"  Docs: {docs_url}\n"
+                f"  Repo: {repo_url}\n"
             )
 
     def _acquire_token(self) -> str:

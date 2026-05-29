@@ -126,7 +126,7 @@ def test_graph_client_delegated_mode_requires_env(
     monkeypatch.setenv("GRAPH_AUTH_MODE", "delegated")
     monkeypatch.delenv("AZURE_CLIENT_SECRET", raising=False)
 
-    with pytest.raises(EnvironmentError, match="delegated mode"):
+    with pytest.raises(EnvironmentError, match="AZURE_TENANT_ID"):
         auth_mod.GraphClient(auth_mode="delegated")
 
 

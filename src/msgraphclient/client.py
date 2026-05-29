@@ -2,7 +2,7 @@
 
 This module is the primary entry point for the library. It reads environment
 configuration (via ``.env``) and passes credentials to
-:class:`python.auth.GraphAuthenticator` for token acquisition.
+:class:`msgraphclient.auth.GraphAuthenticator` for token acquisition.
 """
 
 from __future__ import annotations
