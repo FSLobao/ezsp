@@ -71,19 +71,19 @@ MSGraphClient/
 
 ## Graph Surface
 
-### `src/python/auth.py`
+### `src/msgraphclient/auth.py`
 - `GraphClient` encapsula a sessão HTTP autenticada e a formatação de erros Graph.
 - `GraphAuthenticator` valida config, obtém token e expõe metadados do site.
 - A descoberta do site agora vive em `GraphAuthenticator`.
 
-### `src/python/drive.py`
+### `src/msgraphclient/drive.py`
 - `GraphDrive.list_drive_items(folder_path)`
 - `GraphDrive.download_file(item_id, local_path)`
 - `GraphDrive.upload_file(local_path, remote_folder, remote_name=None)`
 - `GraphDrive.read_file_content(item_id)`
 - `GraphDrive.write_file_content(item_id, content)`
 
-### `src/python/lists.py`
+### `src/msgraphclient/lists.py`
 - `GraphList.get_views()` com fallback seguro para listas sem views
 - `GraphList.get_view_columns(view_id)`
 - `GraphList.get_columns(names=None)` com filtro de metadados via Graph

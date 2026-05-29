@@ -1,5 +1,5 @@
 """
-python — Microsoft Graph / SharePoint client abstractions powered by MSAL.
+msgraphclient — Microsoft Graph / SharePoint client abstractions powered by MSAL.
 
 Subpackages:
   auth        — MSAL authentication helpers (GraphAuthenticator)
