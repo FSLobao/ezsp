@@ -50,9 +50,10 @@ Este repositório apresenta a seguinte organização:
 		<li><strong>python/</strong>: implementacao do cliente Graph e operacoes de SharePoint
 			<ul>
 				<li><code>__init__.py</code>: ponto de entrada do pacote para importacoes publicas</li>
-				<li><code>auth.py</code>: autenticacao (app_only/delegated), sessao HTTP e descoberta de metadados do site</li>
+				<li><code>auth.py</code>: autenticacao MSAL (app_only/delegated) — valida credenciais e adquire tokens</li>
+				<li><code>client.py</code>: ponto de entrada principal — le .env, gerencia sessao HTTP e descoberta do site</li>
 				<li><code>drive.py</code>: listagem, upload, download e leitura/escrita de conteudo em bibliotecas de documentos</li>
-				<li><code>lists.py</code>: consulta de colunas/views e operacoes de create/update em itens de lista</li>
+				<li><code>lists.py</code>: consulta de colunas/views, validacao tipada e operacoes de create/update em itens de lista</li>
 			</ul>
 		</li>
 	</ul>
@@ -61,15 +62,19 @@ Este repositório apresenta a seguinte organização:
 <details>
 	<summary><strong>tests/</strong>: testes automatizados de unidade e comportamento</summary>
 	<ul>
-		<li><code>test_auth.py</code>: validacao dos fluxos de autenticacao e descoberta de site</li>
+		<li><code>test_auth.py</code>: validacao dos fluxos de autenticacao e aquisicao de token</li>
+		<li><code>test_graph_client.py</code>: cobertura do GraphClient (sessao HTTP, helpers get/post/patch)</li>
+		<li><code>test_site.py</code>: cobertura da descoberta e metadados do site</li>
 		<li><code>test_drive.py</code>: cobertura das operacoes de arquivos e bibliotecas</li>
-		<li><code>test_lists.py</code>: cobertura das operacoes em listas e itens</li>
+		<li><code>test_lists.py</code>: cobertura das operacoes em listas, validacao tipada e metadados</li>
 	</ul>
 </details>
 
 <details>
 	<summary><strong>examples/</strong>: scripts de referencia para execucao rapida por caso de uso</summary>
 	<ul>
+		<li><code>example_site_contents.py</code>: demonstra consulta de conteudo do site (drives e lists)</li>
+		<li><code>example_delegated_site_contents.py</code>: mesmo fluxo com autenticacao delegada</li>
 		<li><code>example_drive_list.py</code>: demonstra listagem de itens no drive do site</li>
 		<li><code>example_drive_download.py</code>: exemplo de download de arquivo remoto para disco local</li>
 		<li><code>example_drive_upload.py</code>: exemplo de upload de arquivo local para o SharePoint</li>
@@ -77,7 +82,6 @@ Este repositório apresenta a seguinte organização:
 		<li><code>example_list_get.py</code>: consulta de itens de lista para analise e validacao</li>
 		<li><code>example_list_create.py</code>: criacao de novos itens em lista SharePoint</li>
 		<li><code>example_list_update.py</code>: atualizacao de campos em itens existentes</li>
-		<li><code>bulk_create_example.json</code>: modelo de entrada para o fluxo de criacao em lote</li>
 	</ul>
 </details>
 
@@ -122,7 +126,7 @@ Este repositório apresenta a seguinte organização:
 
 | Requisito | Observações |
 |---|---|
-| Python ≥ 3.11 | Testado com 3.11+ |
+| Python ≥ 3.11 | Testado com 3.14 |
 | [UV](https://docs.astral.sh/uv/) | Gerenciador de pacotes e ambiente virtual |
 | Registro de aplicativo no Microsoft Entra ID | Configure `Sites.Selected` e inscreva os sites necessários |
 
@@ -175,7 +179,7 @@ Variáveis opcionais para modo de autenticação:
 
 ### 3. Escolher o modelo de autenticação
 
-- **`client_credentials`** (alias: `app_only`): indicado para automação sem interação do usuário.
+- **`client_credentials`**: indicado para automação sem interação do usuário.
 - **`delegated`**: indicado quando é necessário associar as ações a um usuário autenticado.
 
 Nos dois casos, o projeto usa `Sites.Selected` e exige inscrição explícita do site.
@@ -273,19 +277,37 @@ O utilitário em lote aplica o mesmo modelo de segurança do restante do projeto
 
 ## Visão geral dos módulos
 
+### `client.py`
+`GraphClient` é o ponto de entrada principal. Lê variáveis de ambiente do `.env`,
+cria um `GraphAuthenticator` interno, gerencia a sessão HTTP autenticada e expõe
+helpers de requisição (`get`, `post`, `patch`, `put_bytes`, `get_raw`) além de
+métodos de descoberta do site.
+
+| Método / Atributo | Descrição |
+|---|---|
+| `GraphClient()` | Lê `.env`, autentica e carrega metadados do site |
+| `client.site_graph_id` | ID Graph do site conectado |
+| `client.site_name` | Nome interno do site |
+| `client.site_display_name` | Nome de exibição do site |
+| `client.site_web_url` | URL do site no SharePoint |
+| `client.site_drives` | Lista de drives do site |
+| `client.site_lists` | Lista de lists do site |
+| `client.get_site_contents()` | Retorna metadados do site, drives e lists |
+| `client.refresh_site_info()` | Recarrega metadados do site a partir do Graph |
+
 ### `auth.py`
-Obtém um token Bearer para a Microsoft Graph API usando o fluxo OAuth 2.0 de
-**credenciais do cliente** via [MSAL](https://github.com/AzureAD/microsoft-authentication-library-for-python).
+`GraphAuthenticator` é responsável exclusivamente pela autenticação MSAL.
+Recebe credenciais explícitas (não lê `.env`) e adquire tokens OAuth 2.0
+via fluxo de credenciais do cliente ou fluxo delegado interativo.
 
 Para o fluxo delegado, veja [docs/setup_delegated_auth.md](docs/setup_delegated_auth.md).
 
-### `auth.py`
-`GraphClient` é o cliente principal do Microsoft Graph. Ele gerencia a sessão
-HTTP autenticada, expõe os helpers `get`, `post`, `patch`, `put_bytes` e
-`get_raw`, e possui um `GraphAuthenticator` associado para descoberta do site.
-
 ### `drive.py`
-Operações de biblioteca de documentos:
+Operações de biblioteca de documentos. Requer `drive_id` explícito na construção.
+
+```python
+drive = GraphDrive(drive_id=os.environ["SHAREPOINT_DRIVE_ID"], client=client)
+```
 
 | Método | Descrição |
 |---|---|
@@ -296,7 +318,11 @@ Operações de biblioteca de documentos:
 | `GraphDrive.write_file_content(item_id, content)` | Sobrescreve o conteúdo textual do arquivo |
 
 ### `lists.py`
-Operações de listas do SharePoint:
+Operações de listas do SharePoint. Requer `list_id` explícito na construção.
+
+```python
+list_client = GraphList(list_id=os.environ["SHAREPOINT_LIST_ID"], client=client)
+```
 
 | Método | Descrição |
 |---|---|
@@ -313,14 +339,16 @@ Operações de listas do SharePoint:
 | `GraphList.save_items(items)` | Persiste múltiplos itens, interrompendo no primeiro erro |
 | `GraphList.save_dataframe(dataframe)` | Persiste linhas de DataFrame no formato da API nova |
 
-### `auth.py`
-`GraphAuthenticator` concentra a descoberta do site:
+A validação em `validate_item` utiliza metadados extraídos da definição de coluna no Graph:
 
-| Método | Descrição |
+| Tipo | Regras aplicadas |
 |---|---|
-| `GraphAuthenticator.get_site_contents()` | Retorna metadados do site, drives e lists |
-| `GraphAuthenticator.list_site_drives()` | Lista os drives do site |
-| `GraphAuthenticator.list_site_lists()` | Lista as lists do site |
+| `text` | Deve ser `str`; rejeita quebras de linha; respeita `max_length` da coluna (padrão 255) |
+| `note` | Deve ser `str`; permite quebras de linha; respeita `max_length` (padrão 63999) |
+| `number` | Deve ser `int`/`float`; rejeita valores fora de `minimum`/`maximum` quando definidos |
+| `boolean` | Deve ser `bool` |
+| `dateTime` | Deve ser `str`, `datetime` ou `date`; valida parsing ISO |
+| `choice` | Deve ser `str`; rejeita valores fora da lista quando `allowTextEntry` é `False` |
 
 [⬆ Voltar ao topo](#topo)
 

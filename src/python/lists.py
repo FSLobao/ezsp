@@ -93,6 +93,11 @@ class GraphList:
             for entry in self.column_schema
             if entry["choices"]
         }
+        self._field_validation: dict[str, dict] = {
+            entry["display_name"]: entry["validation"]
+            for entry in self.column_schema
+            if entry["validation"]
+        }
 
     # -------------------------------------------------------------------------
     # Env / client helpers (unchanged)
@@ -122,33 +127,51 @@ class GraphList:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def _detect_column_type(col: dict) -> tuple[str, list]:
+    def _detect_column_type(col: dict) -> tuple[str, list, dict]:
         """Detect the Graph column type from the type-specific sub-object.
 
         Graph column definitions carry a type-discriminator sub-object whose
         key names the type (e.g. ``"text": {}``, ``"choice": {...}``).
 
         Returns:
-            A (type_str, choices) tuple where ``choices`` is a list of allowed
-            values for choice columns and an empty list for all other types.
+            A (type_str, choices, validation) tuple where ``choices`` is a list
+            of allowed values for choice columns (empty list otherwise) and
+            ``validation`` is a dict of type-specific constraints extracted from
+            the Graph column definition.
         """
+        validation: dict = {}
+
         for type_key in ("text", "note"):
             if type_key in col:
-                return type_key, []
+                sub = col[type_key]
+                max_length = sub.get("maxLength")
+                if max_length is not None:
+                    validation["max_length"] = int(max_length)
+                return type_key, [], validation
         if "number" in col:
-            return "number", []
+            sub = col["number"]
+            if "minimum" in sub:
+                validation["minimum"] = sub["minimum"]
+            if "maximum" in sub:
+                validation["maximum"] = sub["maximum"]
+            if "decimalPlaces" in sub:
+                validation["decimal_places"] = sub["decimalPlaces"]
+            return "number", [], validation
         if "dateTime" in col:
-            return "dateTime", []
+            return "dateTime", [], validation
         if "boolean" in col:
-            return "boolean", []
+            return "boolean", [], validation
         if "choice" in col:
-            choices = col["choice"].get("choices", [])
-            return "choice", choices
+            sub = col["choice"]
+            choices = sub.get("choices", [])
+            allow_text_entry = sub.get("allowTextEntry", False)
+            validation["allow_text_entry"] = allow_text_entry
+            return "choice", choices, validation
         if "lookup" in col:
-            return "lookup", []
+            return "lookup", [], validation
         if "personOrGroup" in col:
-            return "personOrGroup", []
-        return "text", []  # fallback for unrecognised types
+            return "personOrGroup", [], validation
+        return "text", [], validation
 
     def _load_column_schema(self) -> list[dict]:
         """Fetch and filter column definitions from the Graph columns endpoint.
@@ -178,7 +201,7 @@ class GraphList:
             name = col.get("name", "")
             display_name = col.get("displayName", name)
             required = col.get("required", False)
-            graph_type, choices = self._detect_column_type(col)
+            graph_type, choices, validation = self._detect_column_type(col)
 
             schema.append(
                 {
@@ -188,6 +211,7 @@ class GraphList:
                     "required": required,
                     "read_only": graph_type == "lookup",
                     "choices": choices,
+                    "validation": validation,
                 }
             )
 
@@ -202,7 +226,8 @@ class GraphList:
 
         Each entry is a dict with keys ``display_name``, ``type``,
         ``required``, and ``read_only``. Choice columns additionally include
-        a ``choices`` key with the list of allowed values.
+        a ``choices`` key with the list of allowed values. Columns with
+        type-specific constraints include a ``validation`` key.
 
         Returns:
             List of column schema dicts.
@@ -217,6 +242,8 @@ class GraphList:
             }
             if entry["choices"]:
                 row["choices"] = entry["choices"]
+            if entry["validation"]:
+                row["validation"] = entry["validation"]
             result.append(row)
         return result
 
@@ -424,6 +451,7 @@ class GraphList:
             return
 
         graph_type = self._field_types.get(display_name, "text")
+        constraints = self._field_validation.get(display_name, {})
 
         if graph_type in ("text", "note", "personOrGroup"):
             if not isinstance(value, str):
@@ -431,11 +459,25 @@ class GraphList:
                     f"Column '{display_name}' expects str, "
                     f"got {type(value).__name__!r}."
                 )
-            if graph_type == "text" and ("\n" in value or "\r" in value):
-                raise TypeError(
-                    f"Column '{display_name}' is single-line text and must not "
-                    f"contain newline characters."
-                )
+            if graph_type == "text":
+                if "\n" in value or "\r" in value:
+                    raise TypeError(
+                        f"Column '{display_name}' is single-line text and must not "
+                        f"contain newline characters."
+                    )
+                max_len = constraints.get("max_length", 255)
+                if len(value) > max_len:
+                    raise ValueError(
+                        f"Column '{display_name}' is single-line text and must not "
+                        f"exceed {max_len} characters (got {len(value)})."
+                    )
+            elif graph_type == "note":
+                max_len = constraints.get("max_length", 63999)
+                if len(value) > max_len:
+                    raise ValueError(
+                        f"Column '{display_name}' is multi-line text and must not "
+                        f"exceed {max_len} characters (got {len(value)})."
+                    )
 
         elif graph_type == "number":
             # bool is a subclass of int in Python; reject it explicitly.
@@ -443,6 +485,18 @@ class GraphList:
                 raise TypeError(
                     f"Column '{display_name}' expects int or float, "
                     f"got {type(value).__name__!r}."
+                )
+            minimum = constraints.get("minimum")
+            maximum = constraints.get("maximum")
+            if minimum is not None and value < minimum:
+                raise ValueError(
+                    f"Column '{display_name}' value {value} is below the "
+                    f"minimum allowed ({minimum})."
+                )
+            if maximum is not None and value > maximum:
+                raise ValueError(
+                    f"Column '{display_name}' value {value} exceeds the "
+                    f"maximum allowed ({maximum})."
                 )
 
         elif graph_type == "boolean":
@@ -474,7 +528,8 @@ class GraphList:
                     f"got {type(value).__name__!r}."
                 )
             allowed = self._field_choices.get(display_name, [])
-            if allowed and value not in allowed:
+            allow_text_entry = constraints.get("allow_text_entry", False)
+            if allowed and value not in allowed and not allow_text_entry:
                 raise ValueError(
                     f"Column '{display_name}' value {value!r} is not one of "
                     f"the allowed choices: {allowed}."

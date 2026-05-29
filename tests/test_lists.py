@@ -353,6 +353,7 @@ def test_get_schema_returns_editable_columns(env: None) -> None:
             "required": False,
             "read_only": False,
             "choices": ["Active", "Closed"],
+            "validation": {"allow_text_entry": False},
         },
         {
             "display_name": "Start Date",
@@ -506,6 +507,23 @@ def test_validate_item_text_rejects_newline(env: None) -> None:
         list_client.validate_item({"Title": "Line1\nLine2"})
 
 
+def test_validate_item_text_rejects_over_255(env: None) -> None:
+    """Single-line text columns should reject values exceeding 255 chars."""
+    list_client = lists_mod.GraphList(list_id="list-abc", client=_mock_client())
+
+    with pytest.raises(ValueError, match="exceed 255 characters"):
+        list_client.validate_item({"Title": "x" * 256})
+
+
+def test_validate_item_note_rejects_over_63999(env: None) -> None:
+    """Multi-line note columns should reject values exceeding 63999 chars."""
+    list_client = lists_mod.GraphList(list_id="list-abc", client=_mock_client())
+    list_client._field_types["Customer Name"] = "note"
+
+    with pytest.raises(ValueError, match="exceed 63999 characters"):
+        list_client.validate_item({"Title": "Item", "Customer Name": "x" * 64000})
+
+
 def test_validate_item_note_accepts_newline(env: None) -> None:
     """Multi-line note columns should accept values with newlines."""
     list_client = lists_mod.GraphList(list_id="list-abc", client=_mock_client())
@@ -513,6 +531,66 @@ def test_validate_item_note_accepts_newline(env: None) -> None:
     list_client._field_types["Customer Name"] = "note"
 
     list_client.validate_item({"Title": "Item", "Customer Name": "Line1\nLine2"})
+
+
+def test_validate_item_text_respects_custom_max_length(env: None) -> None:
+    """Single-line text should use max_length from column validation metadata."""
+    list_client = lists_mod.GraphList(list_id="list-abc", client=_mock_client())
+    list_client._field_validation["Title"] = {"max_length": 50}
+
+    # Exactly 50 chars should pass
+    list_client.validate_item({"Title": "x" * 50})
+
+    # 51 chars should fail
+    with pytest.raises(ValueError, match="exceed 50 characters"):
+        list_client.validate_item({"Title": "x" * 51})
+
+
+def test_validate_item_number_below_minimum(env: None) -> None:
+    """Number columns should reject values below the configured minimum."""
+    list_client = lists_mod.GraphList(list_id="list-abc", client=_mock_client())
+    list_client._field_types["Customer Name"] = "number"
+    list_client._field_validation["Customer Name"] = {"minimum": 0, "maximum": 100}
+
+    with pytest.raises(ValueError, match="below the minimum"):
+        list_client.validate_item({"Title": "Item", "Customer Name": -1})
+
+
+def test_validate_item_number_above_maximum(env: None) -> None:
+    """Number columns should reject values above the configured maximum."""
+    list_client = lists_mod.GraphList(list_id="list-abc", client=_mock_client())
+    list_client._field_types["Customer Name"] = "number"
+    list_client._field_validation["Customer Name"] = {"minimum": 0, "maximum": 100}
+
+    with pytest.raises(ValueError, match="exceeds the maximum"):
+        list_client.validate_item({"Title": "Item", "Customer Name": 101})
+
+
+def test_validate_item_number_within_range(env: None) -> None:
+    """Number columns should accept values within the configured range."""
+    list_client = lists_mod.GraphList(list_id="list-abc", client=_mock_client())
+    list_client._field_types["Customer Name"] = "number"
+    list_client._field_validation["Customer Name"] = {"minimum": 0, "maximum": 100}
+
+    list_client.validate_item({"Title": "Item", "Customer Name": 50})
+
+
+def test_validate_item_choice_allow_text_entry(env: None) -> None:
+    """Choice columns with allow_text_entry should accept unlisted values."""
+    list_client = lists_mod.GraphList(list_id="list-abc", client=_mock_client())
+    list_client._field_validation["Status"] = {"allow_text_entry": True}
+
+    # "Custom" is not in ["Active", "Closed"] but should be accepted
+    list_client.validate_item({"Title": "Item", "Status": "Custom"})
+
+
+def test_validate_item_choice_disallow_text_entry(env: None) -> None:
+    """Choice columns without allow_text_entry should reject unlisted values."""
+    list_client = lists_mod.GraphList(list_id="list-abc", client=_mock_client())
+    list_client._field_validation["Status"] = {"allow_text_entry": False}
+
+    with pytest.raises(ValueError, match="not one of the allowed choices"):
+        list_client.validate_item({"Title": "Item", "Status": "Custom"})
 
 
 def test_save_item_create_calls_post(env: None) -> None:
