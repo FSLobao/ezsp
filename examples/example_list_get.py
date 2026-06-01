@@ -14,6 +14,46 @@ from msgraphclient.auth import GraphClient
 from msgraphclient.lists import GraphList
 
 
+def _as_display_name_list(
+    list_client: GraphList,
+    columns: list[Any] | None,
+) -> list[str]:
+    """Normalize column payloads to schema-known display names only."""
+    schema_display_names = {
+        entry["display_name"]
+        for entry in list_client.get_schema()
+        if not entry.get("read_only", False)
+    }
+
+    selected: list[str] = []
+    for col in columns or []:
+        display_name: str | None = None
+
+        # get_columns() usually returns dicts with displayName/name.
+        if isinstance(col, dict):
+            raw_display = col.get("displayName")
+            raw_name = col.get("name")
+            if isinstance(raw_display, str) and raw_display.strip():
+                display_name = raw_display.strip()
+            elif isinstance(raw_name, str) and raw_name.strip():
+                # get_view_columns() and some APIs may expose internal names.
+                display_name = list_client._name_to_display.get(raw_name.strip())
+
+        # Some endpoints may return plain string internal names.
+        elif isinstance(col, str) and col.strip():
+            display_name = list_client._name_to_display.get(col.strip())
+
+        if not display_name:
+            continue
+        if display_name == "Title":
+            continue
+        if display_name in schema_display_names:
+            selected.append(display_name)
+
+    # Keep stable order while removing duplicates.
+    return list(dict.fromkeys(selected))
+
+
 def _prompt_view_selection(views: list[dict]) -> dict | None:
     """Print numbered view list, prompt the user and return the chosen view dict.
 
@@ -141,13 +181,16 @@ def run_example_list_get(
 
     if show_output:
         print("Fetching SharePoint list items...\n")
-    selected_display_names = [
-        col["displayName"]
-        for col in columns
-        if col.get("displayName") and col["displayName"] != "Title"
-    ]
+    selected_display_names = _as_display_name_list(resolved_list_client, columns)
+
+    if show_output and not selected_display_names:
+        print(
+            "No selectable schema columns resolved from current view/metadata; "
+            "falling back to default editable columns."
+        )
+
     df_list_content = resolved_list_client.get_items_dataframe(
-        select=selected_display_names,
+        select=selected_display_names or None,
         include_id=True,
     )
     if df_list_content.empty:

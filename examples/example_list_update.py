@@ -27,17 +27,31 @@ def _build_typed_update(
     list_client: GraphList,
     current_item: dict[str, Any],
     number_increment: float,
-) -> dict:
-    """Build an update payload modifying all writable columns with supported types."""
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Build update payload and return (payload, skipped_columns_dict).
+
+    Returns:
+        A tuple of (payload, skipped) where payload is the update data
+        and skipped is a {displayName: reason} dict for diagnostic output.
+    """
     payload: dict[str, Any] = {}
+    skipped: dict[str, str] = {}
     timestamp = datetime.now(timezone.utc)
     timestamp_label = timestamp.isoformat()
 
     for entry in list_client.get_schema():
+        display_name = str(entry["display_name"])
+
         if entry.get("read_only"):
+            skipped[display_name] = "read-only"
             continue
 
-        display_name = str(entry["display_name"])
+        validation = entry.get("validation", {}) or {}
+        if validation.get("implemented") is False:
+            field_type = entry.get("type", "unknown")
+            skipped[display_name] = f"type '{field_type}' not implemented"
+            continue
+
         field_type = entry.get("type")
         current_value = current_item.get(display_name)
 
@@ -67,6 +81,7 @@ def _build_typed_update(
         elif field_type == "choice":
             choices = entry.get("choices", [])
             if not choices:
+                skipped[display_name] = "choice type with no options"
                 continue
             if current_value in choices:
                 current_index = choices.index(current_value)
@@ -74,7 +89,7 @@ def _build_typed_update(
             else:
                 payload[display_name] = choices[0]
 
-    return payload
+    return payload, skipped
 
 
 def run_example_list_update(
@@ -136,7 +151,7 @@ def run_example_list_update(
         str(key): value for key, value in raw_current_item.items()
     }
 
-    typed_update = _build_typed_update(
+    typed_update, skipped_columns = _build_typed_update(
         resolved_list_client,
         current_item,
         number_increment=number_increment,
@@ -144,6 +159,10 @@ def run_example_list_update(
     if not typed_update:
         if show_output:
             print("No writable fields of supported types were found to update.")
+            if skipped_columns:
+                print(f"\nSkipped {len(skipped_columns)} columns:")
+                for col_name, reason in sorted(skipped_columns.items()):
+                    print(f"  - {col_name}: {reason}")
         return {
             "client": resolved_client,
             "authenticator": resolved_client.authenticator,
@@ -157,9 +176,13 @@ def run_example_list_update(
     payload = {"_id": target_item_id, **typed_update}
 
     if show_output:
-        print(f"\nUpdating item {target_item_id} with typed payload:")
+        print(f"\nUpdating item {target_item_id} with {len(typed_update)} fields:")
         for key, value in typed_update.items():
             print(f"  - {key}: {value}")
+        if skipped_columns:
+            print(f"\nSkipped {len(skipped_columns)} columns:")
+            for col_name, reason in sorted(skipped_columns.items()):
+                print(f"  - {col_name}: {reason}")
 
     result = resolved_list_client.save_item(payload)
 
@@ -175,6 +198,7 @@ def run_example_list_update(
         "item_id": target_item_id,
         "typed_update": typed_update,
         "updated_item": result,
+        "skipped_columns": skipped_columns,
         "success": True,
     }
 

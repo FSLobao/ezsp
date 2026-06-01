@@ -45,6 +45,18 @@ def _sample_columns() -> list[dict]:
             "lookup": {},
         },
         {
+            "name": "field_person",
+            "displayName": "Assigned To",
+            "required": False,
+            "personOrGroup": {},
+        },
+        {
+            "name": "field_image",
+            "displayName": "Imagem",
+            "required": False,
+            "thumbnail": {},
+        },
+        {
             "name": "Author",
             "displayName": "Created By",
             "readOnly": True,
@@ -327,6 +339,8 @@ def test_load_column_schema_filters_metadata(env: None) -> None:
         "Status",
         "Start Date",
         "Parent Item",
+        "Assigned To",
+        "Imagem",
     ]
 
 
@@ -366,6 +380,21 @@ def test_get_schema_returns_editable_columns(env: None) -> None:
             "type": "lookup",
             "required": False,
             "read_only": True,
+            "validation": {"implemented": False},
+        },
+        {
+            "display_name": "Assigned To",
+            "type": "personOrGroup",
+            "required": False,
+            "read_only": False,
+            "validation": {"implemented": False},
+        },
+        {
+            "display_name": "Imagem",
+            "type": "image",
+            "required": False,
+            "read_only": False,
+            "validation": {"implemented": False},
         },
     ]
 
@@ -380,6 +409,8 @@ def test_get_field_types_returns_mapping(env: None) -> None:
         "Status": "choice",
         "Start Date": "dateTime",
         "Parent Item": "lookup",
+        "Assigned To": "personOrGroup",
+        "Imagem": "image",
     }
 
 
@@ -490,6 +521,22 @@ def test_validate_item_choice_invalid(env: None) -> None:
 
     with pytest.raises(ValueError, match="allowed choices"):
         list_client.validate_item({"Title": "Item", "Status": "Pending"})
+
+
+def test_validate_item_unimplemented_type(env: None) -> None:
+    """Unsupported write types should fail with an explicit validation error."""
+    list_client = lists_mod.GraphList(list_id="list-abc", client=_mock_client())
+
+    with pytest.raises(ValueError, match="type 'personOrGroup'.*not implemented"):
+        list_client.validate_item({"Title": "Item", "Assigned To": "user@example.com"})
+
+    with pytest.raises(ValueError, match="type 'image'.*not implemented"):
+        list_client.validate_item(
+            {"Title": "Item", "Imagem": "https://example.com/image.png"}
+        )
+
+    with pytest.raises(ValueError, match="type 'lookup'.*not implemented"):
+        list_client.validate_item({"Title": "Item", "Parent Item": "42"})
 
 
 def test_validate_item_datetime_string(env: None) -> None:

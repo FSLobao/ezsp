@@ -33,6 +33,25 @@ from msgraphclient.auth import GraphClient
 from msgraphclient.client import GRAPH_BASE_URL
 
 
+_UNIMPLEMENTED_COLUMN_TYPES: dict[str, str] = {
+    "calculated": "calculated",
+    "contentApprovalStatus": "contentApprovalStatus",
+    "currency": "currency",
+    "geolocation": "geolocation",
+    "hyperlinkOrPicture": "hyperlinkOrPicture",
+    "lookup": "lookup",
+    "personOrGroup": "personOrGroup",
+    "term": "term",
+    "thumbnail": "image",
+}
+
+_UNIMPLEMENTED_INTERNAL_FIELD_TYPES: dict[str, str] = {
+    "attachments": "attachments",
+    "contenttype": "contentType",
+    "contenttypeid": "contentType",
+}
+
+
 class GraphList:
     """SharePoint list operations backed by Microsoft Graph.
 
@@ -167,10 +186,19 @@ class GraphList:
             allow_text_entry = sub.get("allowTextEntry", False)
             validation["allow_text_entry"] = allow_text_entry
             return "choice", choices, validation
-        if "lookup" in col:
-            return "lookup", [], validation
-        if "personOrGroup" in col:
-            return "personOrGroup", [], validation
+
+        for facet_name, public_type in _UNIMPLEMENTED_COLUMN_TYPES.items():
+            if facet_name in col:
+                return public_type, [], {"implemented": False}
+
+        internal_name = str(col.get("name", "")).strip().casefold()
+        if internal_name in _UNIMPLEMENTED_INTERNAL_FIELD_TYPES:
+            return (
+                _UNIMPLEMENTED_INTERNAL_FIELD_TYPES[internal_name],
+                [],
+                {"implemented": False},
+            )
+
         return "text", [], validation
 
     def _load_column_schema(self) -> list[dict]:
@@ -250,8 +278,9 @@ class GraphList:
     def get_field_types(self) -> dict[str, str]:
         """Return a ``{displayName: type}`` mapping for all schema columns.
 
-        Types are Graph column type strings: ``text``, ``number``,
-        ``dateTime``, ``boolean``, ``choice``, ``lookup``, ``personOrGroup``.
+        Types are Graph column type strings such as ``text``, ``number``,
+        ``dateTime``, ``boolean``, ``choice``, ``lookup``, ``personOrGroup``,
+        and ``image``.
         """
         return dict(self._field_types)
 
@@ -447,13 +476,19 @@ class GraphList:
             ValueError: If the value is structurally invalid (bad choice,
                 unparseable datetime string).
         """
-        if value is None:
-            return
-
         graph_type = self._field_types.get(display_name, "text")
         constraints = self._field_validation.get(display_name, {})
 
-        if graph_type in ("text", "note", "personOrGroup"):
+        if constraints.get("implemented") is False:
+            raise ValueError(
+                f"Column '{display_name}' uses type '{graph_type}', which is not "
+                "implemented for write operations."
+            )
+
+        if value is None:
+            return
+
+        if graph_type in ("text", "note"):
             if not isinstance(value, str):
                 raise TypeError(
                     f"Column '{display_name}' expects str, "
@@ -571,10 +606,11 @@ class GraphList:
             entry = next(
                 (e for e in self.column_schema if e["display_name"] == key), None
             )
-            if entry and entry.get("read_only"):
-                raise ValueError(f"Column '{key}' is read-only and cannot be written.")
 
             self._validate_type(key, value)
+
+            if entry and entry.get("read_only"):
+                raise ValueError(f"Column '{key}' is read-only and cannot be written.")
 
         if is_create:
             for entry in self.column_schema:
@@ -670,6 +706,7 @@ class GraphList:
             entry["display_name"]: None
             for entry in self.column_schema
             if not entry.get("read_only", False)
+            and entry.get("validation", {}).get("implemented", True)
             and (include_optional or entry.get("required", False))
         }
 
