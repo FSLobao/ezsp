@@ -49,16 +49,21 @@ def _trim_to_max_length(value: str, max_length: int | None) -> str:
 
 
 def _single_line_text(max_length: int | None = None) -> str:
-    """Generate single-line text compatible with Graph 'text' columns."""
-    value = f"single line text created by example_list_create.py at {_now_timestamp()}"
+    """Generate single-line text compatible with Graph 'text' columns (no newlines)."""
+    # Build text without any embedded newlines or special characters
+    timestamp = _now_timestamp()
+    value = f"single line text created by example_list_create.py at {timestamp}"
+    # Ensure no newlines exist in the final value
+    value = value.replace("\n", " ").replace("\r", " ")
     return _trim_to_max_length(value, max_length)
 
 
 def _multiline_text(max_length: int | None = None) -> str:
-    """Generate multiline text compatible with Graph 'note' columns."""
+    """Generate multiline text compatible with Graph 'note' columns (with newlines)."""
+    timestamp = _now_timestamp()
+    # Use only LF (\n) for line breaks, not CRLF
     value = (
-        "multiline text created by example_list_create.py at "
-        f"{_now_timestamp()}\n"
+        f"multiline text created by example_list_create.py at {timestamp}\n"
         "line 2: this is an automatically generated value\n"
         "line 3: includes line breaks for multiline fields"
     )
