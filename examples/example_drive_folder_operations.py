@@ -48,7 +48,7 @@ def _graph_remote_folder(path: str) -> str:
     """Convert a normalized folder path into Graph upload folder syntax."""
     if path == "/":
         return "root"
-    return f"root:/{path.strip('/')}:"
+    return f"root:/{path.strip('/')}"
 
 
 def _pick_folder(

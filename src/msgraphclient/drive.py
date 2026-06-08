@@ -164,6 +164,31 @@ class GraphDrive:
         dest.write_bytes(raw)
         return dest.resolve()
 
+    def _normalize_upload_remote_folder(self, remote_folder: str) -> str:
+        """Return a canonical Graph folder spec for upload operations.
+
+        Accepted forms include ``root``, ``/Folder``, ``Folder``,
+        ``root:/Folder`` and ``root:/Folder:``.
+        """
+        raw = (remote_folder or "").strip().replace("\\", "/")
+        if raw in {"", ".", "/", "root", "root:", "root:/"}:
+            return "root"
+
+        if raw.startswith("root:/"):
+            tail = raw[len("root:/") :]
+        elif raw.startswith("/"):
+            tail = raw[1:]
+        else:
+            tail = raw
+
+        tail = tail.rstrip(":")
+        parts: list[str] = [
+            segment for segment in tail.split("/") if segment and segment != "."
+        ]
+        if not parts:
+            return "root"
+        return f"root:/{'/'.join(parts)}"
+
     def upload(
         self,
         local_path: str | Path,
@@ -177,7 +202,8 @@ class GraphDrive:
         Args:
             local_path: Path to the local file to upload.
             remote_folder: Target folder expressed as a drive item path,
-                e.g. ``"root:/Documents:"``. Defaults to drive root.
+                e.g. ``"root:/Documents"`` (``"root:/Documents:"`` is
+                also accepted). Defaults to drive root.
             remote_name: Desired filename in the drive. Defaults to the
                 local filename.
 
@@ -187,7 +213,11 @@ class GraphDrive:
         src = Path(local_path)
         name = remote_name or src.name
         data = src.read_bytes()
-        path = f"/drives/{self.drive_id}/items/{remote_folder}:/{name}:/content"
+        folder_spec = self._normalize_upload_remote_folder(remote_folder)
+        if folder_spec == "root":
+            path = f"/drives/{self.drive_id}/root:/{name}:/content"
+        else:
+            path = f"/drives/{self.drive_id}/{folder_spec}/{name}:/content"
         return self.client.put_bytes(path, data)
 
     def read(self, item_id: str, encoding: str | None = None) -> str:

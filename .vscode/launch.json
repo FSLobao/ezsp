@@ -47,6 +47,15 @@
             "cwd": "${workspaceFolder}"
         },
         {
+            "name": "Drive: Folder Operations",
+            "type": "python",
+            "request": "launch",
+            "module": "examples.example_drive_folder_operations",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}"
+        },
+        {
             "name": "List: Get Items",
             "type": "python",
             "request": "launch",

@@ -173,6 +173,7 @@ Exemplos adicionais ainda válidos:
 
 ```bash
 uv run examples/example_drive_list.py
+uv run examples/example_drive_folder_operations.py
 uv run examples/example_list_get.py
 uv run notebooks/graph_auth_site_attributes.ipynb
 ```

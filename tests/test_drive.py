@@ -188,7 +188,22 @@ def test_upload(env: None, tmp_path: Path) -> None:
     result = drive.upload(src)
 
     mock_client.put_bytes.assert_called_once()
+    upload_path = mock_client.put_bytes.call_args[0][0]
+    assert upload_path == "/drives/drive-abc/root:/upload_me.txt:/content"
     assert result["name"] == "file.txt"
+
+
+def test_upload_accepts_trailing_colon_remote_folder(env: None, tmp_path: Path) -> None:
+    """Test that upload normalizes trailing-colon folder specs without double colons."""
+    src = tmp_path / "upload_me.txt"
+    src.write_bytes(b"hello world")
+    mock_client = _mock_client()
+    drive = drive_mod.GraphDrive(drive_id="drive-abc", client=mock_client)
+
+    drive.upload(src, remote_folder="root:/Pasta:")
+
+    upload_path = mock_client.put_bytes.call_args[0][0]
+    assert upload_path == "/drives/drive-abc/root:/Pasta/upload_me.txt:/content"
 
 
 def test_read(env: None) -> None:

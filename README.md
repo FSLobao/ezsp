@@ -83,6 +83,7 @@ Este repositório apresenta a seguinte organização:
 		<li><code>example_drive_download.py</code>: exemplo de download de arquivo remoto para disco local</li>
 		<li><code>example_drive_upload.py</code>: exemplo de upload de arquivo local para o SharePoint</li>
 		<li><code>example_drive_read_write.py</code>: leitura e sobrescrita de conteudo textual de arquivo</li>
+		<li><code>example_drive_folder_operations.py</code>: validacao de operacoes em pasta selecionada (listar, navegar, upload, download e leitura/escrita)</li>
 		<li><code>example_list_get.py</code>: consulta de itens de lista para analise e validacao</li>
 		<li><code>example_list_create.py</code>: criacao de novos itens em lista SharePoint</li>
 		<li><code>example_list_update.py</code>: atualizacao de campos em itens existentes</li>
@@ -198,6 +199,7 @@ no site e as permissões que o usuário já possui nesse mesmo site.
 
 ```bash
 uv run examples/example_drive_list.py
+uv run examples/example_drive_folder_operations.py
 uv run examples/example_list_get.py
 ```
 
