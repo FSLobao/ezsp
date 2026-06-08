@@ -43,6 +43,7 @@ class GraphClient:
         - patch
         - put_bytes
         - get_raw
+        - get_raw_with_encoding
 
     Public attributes:
         - authenticator
@@ -243,6 +244,36 @@ class GraphClient:
         response = self._session.get(url, **kwargs)
         self._raise_for_status(response)
         return response.content
+
+    def get_raw_with_encoding(
+        self, path: str, **kwargs: Any
+    ) -> tuple[bytes, str | None]:
+        """Make a GET request returning raw bytes and the server-declared text encoding.
+
+        The encoding is extracted from the ``charset`` parameter of the
+        ``Content-Type`` response header. Falls back to the encoding inferred
+        by ``requests`` when no explicit charset is present in the header.
+
+        Returns:
+            A tuple of ``(raw_bytes, declared_encoding)`` where
+            ``declared_encoding`` is ``None`` when the server does not
+            advertise a charset.
+        """
+        url = f"{GRAPH_BASE_URL}{path}"
+        response = self._session.get(url, **kwargs)
+        self._raise_for_status(response)
+
+        declared_encoding: str | None = None
+        content_type = response.headers.get("Content-Type", "")
+        for part in content_type.split(";"):
+            part = part.strip()
+            if part.lower().startswith("charset="):
+                declared_encoding = part[8:].strip().strip('"')
+                break
+        if declared_encoding is None and response.encoding:
+            declared_encoding = response.encoding
+
+        return response.content, declared_encoding
 
     # -----------------------------------------------------------------
     # Site discovery

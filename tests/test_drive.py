@@ -17,7 +17,11 @@ def env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AZURE_CLIENT_SECRET", "client-secret")
 
 
-def _mock_client(return_value: dict | None = None, raw_bytes: bytes = b"") -> MagicMock:
+def _mock_client(
+    return_value: dict | None = None,
+    raw_bytes: bytes = b"",
+    raw_encoding: str | None = None,
+) -> MagicMock:
     """Create a mock GraphClient instance for testing."""
     client = MagicMock()
     client.get.side_effect = [
@@ -26,6 +30,7 @@ def _mock_client(return_value: dict | None = None, raw_bytes: bytes = b"") -> Ma
         return_value or {},
     ]
     client.get_raw.return_value = raw_bytes
+    client.get_raw_with_encoding.return_value = (raw_bytes, raw_encoding)
     client.put_bytes.return_value = {"id": "item-1", "name": "file.txt"}
     return client
 
@@ -40,6 +45,27 @@ def test_ls_returns_value(env: None) -> None:
 
     assert result == items
     assert mock_client.get.call_count == 3
+
+
+def test_ls_with_explicit_path_keeps_working_folder(env: None) -> None:
+    """Test that ls(path) lists target folder without changing cwd."""
+    items = [{"name": "report1.xlsx"}, {"name": "report2.xlsx"}]
+    mock_client = MagicMock()
+    mock_client.get.side_effect = [
+        {"id": "drive-abc", "name": "Documents", "webUrl": "https://contoso"},
+        {"id": "root", "name": "root", "folder": {"childCount": 1}},
+        {"id": "folder-1", "name": "Reports", "folder": {"childCount": 2}},
+        {"value": items},
+    ]
+
+    drive = drive_mod.GraphDrive(drive_id="drive-abc", client=mock_client)
+
+    result = drive.ls("/Documents/Reports")
+
+    assert result == items
+    assert drive.working_folder == "/"
+    listed_path = mock_client.get.call_args_list[3][0][0]
+    assert listed_path.endswith("/root:/Documents/Reports:/children")
 
 
 def test_graph_drive_initialization_loads_basic_metadata(env: None) -> None:
@@ -107,7 +133,6 @@ def test_pwd_defaults_to_root(env: None) -> None:
     drive = drive_mod.GraphDrive(drive_id="drive-abc", client=mock_client)
 
     assert drive.pwd() == "/"
-    assert drive.cwd == "/"
 
 
 def test_cd_validates_and_changes_folder(env: None) -> None:
@@ -167,13 +192,42 @@ def test_upload(env: None, tmp_path: Path) -> None:
 
 
 def test_read(env: None) -> None:
-    """Test that read decodes binary response as UTF-8 text."""
+    """Test that read decodes binary response as UTF-8 text when no charset is declared."""
     mock_client = _mock_client(raw_bytes="Hello, Graph!".encode("utf-8"))
     drive = drive_mod.GraphDrive(drive_id="drive-abc", client=mock_client)
 
     content = drive.read("item-456")
 
     assert content == "Hello, Graph!"
+    assert drive.last_encoding == "utf-8"
+
+
+def test_read_uses_server_declared_encoding(env: None) -> None:
+    """Test that read uses the charset declared in the HTTP response."""
+    mock_client = _mock_client(
+        raw_bytes="caf\xe9".encode("latin-1"),
+        raw_encoding="latin-1",
+    )
+    drive = drive_mod.GraphDrive(drive_id="drive-abc", client=mock_client)
+
+    content = drive.read("item-456")
+
+    assert content == "caf\xe9"
+    assert drive.last_encoding == "latin-1"
+
+
+def test_read_explicit_encoding_overrides_declared(env: None) -> None:
+    """Test that an explicit encoding argument takes priority over the server charset."""
+    mock_client = _mock_client(
+        raw_bytes="caf\xe9".encode("latin-1"),
+        raw_encoding="utf-8",  # server says utf-8 but bytes are latin-1
+    )
+    drive = drive_mod.GraphDrive(drive_id="drive-abc", client=mock_client)
+
+    content = drive.read("item-456", encoding="latin-1")
+
+    assert content == "caf\xe9"
+    assert drive.last_encoding == "latin-1"
 
 
 def test_write(env: None) -> None:
@@ -186,3 +240,32 @@ def test_write(env: None) -> None:
 
     mock_client.put_bytes.assert_called_once()
     assert result["id"] == "item-456"
+
+
+def test_write_uses_last_encoding_from_read(env: None) -> None:
+    """Test that write round-trips using the encoding detected by a prior read."""
+    raw = "caf\xe9".encode("latin-1")
+    mock_client = _mock_client(raw_bytes=raw, raw_encoding="latin-1")
+    mock_client.put_bytes.return_value = {"id": "item-456"}
+    drive = drive_mod.GraphDrive(drive_id="drive-abc", client=mock_client)
+
+    drive.read("item-456")
+    drive.write("item-456", "caf\xe9")
+
+    mock_client.put_bytes.assert_called_once_with(
+        f"/drives/drive-abc/items/item-456/content",
+        "caf\xe9".encode("latin-1"),
+        content_type="text/plain; charset=latin-1",
+    )
+
+
+def test_write_defaults_to_utf8_without_prior_read(env: None) -> None:
+    """Test that write uses utf-8 when no prior read has set last_encoding."""
+    mock_client = _mock_client()
+    mock_client.put_bytes.return_value = {"id": "item-789"}
+    drive = drive_mod.GraphDrive(drive_id="drive-abc", client=mock_client)
+
+    drive.write("item-789", "hello")
+
+    _, call_kwargs = mock_client.put_bytes.call_args
+    assert call_kwargs["content_type"] == "text/plain; charset=utf-8"
