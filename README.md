@@ -140,10 +140,36 @@ Este repositório apresenta a seguinte organização:
 
 ### 1. Clonar e instalar dependências
 
+Opção A (com UV):
+
 ```bash
 git clone <repo-url>
 cd MSGraphClient
 uv sync
+```
+
+Opção B (sem UV, com venv + pip):
+
+```bash
+git clone <repo-url>
+cd MSGraphClient
+python -m venv .venv
+```
+
+Linux/macOS:
+
+```bash
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -e .
+```
+
+Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -e .
 ```
 
 ### 2. Configurar credenciais
@@ -197,10 +223,20 @@ no site e as permissões que o usuário já possui nesse mesmo site.
 
 ### 4. Executar um exemplo
 
+Com UV:
+
 ```bash
 uv run examples/example_drive_list.py
 uv run examples/example_drive_folder_operations.py
 uv run examples/example_list_get.py
+```
+
+Sem UV (com a venv ativa):
+
+```bash
+python examples/example_drive_list.py
+python examples/example_drive_folder_operations.py
+python examples/example_list_get.py
 ```
 
 [⬆ Voltar ao topo](#topo)
@@ -248,8 +284,23 @@ Quando usar notebooks em vez dos examples:
 
 ## Executando testes
 
+Com UV (forma padrão):
+
 ```bash
 uv run pytest
+```
+
+Se o seu ambiente Windows apresentar erro ao resolver o script `pytest` via UV
+(`Failed to canonicalize script path`), use:
+
+```powershell
+uv run --python .\.venv\Scripts\python.exe python -m pytest tests/
+```
+
+Sem UV (com a venv ativa):
+
+```bash
+python -m pytest tests/
 ```
 
 Relatório de cobertura é impresso automaticamente. Os testes usam mocking e **não**
@@ -326,8 +377,20 @@ locale/chave nao existe.
 Operações de biblioteca de documentos. Requer `drive_id` explícito na construção.
 
 ```python
-drive = GraphDrive(drive_id=os.environ["SHAREPOINT_DRIVE_ID"], client=client)
+drive = GraphDrive(
+	drive_id=os.environ["SHAREPOINT_DRIVE_ID"],
+	client=client,
+	working_folder="/",  # opcional
+)
 ```
+
+Na inicialização, `GraphDrive` consulta metadados básicos do drive e expõe:
+`drive_info`, `drive_graph_id`, `drive_name`, `drive_web_url` e `drive_type`.
+
+Regras de caminho para `cd()` e `ls(path=...)`:
+- Suporta caminhos absolutos (`/Documents/Reports`, `root:/Documents/Reports`) e relativos (`Reports`, `../Archive`).
+- Normaliza `.` e `..`.
+- Sempre valida no Graph se o destino existe e é pasta.
 
 | Método | Descrição |
 |---|---|
@@ -335,9 +398,9 @@ drive = GraphDrive(drive_id=os.environ["SHAREPOINT_DRIVE_ID"], client=client)
 | `GraphDrive.pwd()` | Retorna a pasta de trabalho atual |
 | `GraphDrive.cd(path)` | Altera a pasta de trabalho, validando no SharePoint |
 | `GraphDrive.download(item_id, local_path)` | Baixa um arquivo para disco |
-| `GraphDrive.upload(local_path, remote_folder="root", remote_name=None)` | Envia um arquivo local (≤ 4 MB) |
-| `GraphDrive.read(item_id, encoding=None)` | Retorna o conteúdo textual; charset detectado do cabeçalho HTTP |
-| `GraphDrive.write(item_id, content, encoding=None)` | Sobrescreve o conteúdo; usa o encoding da última leitura |
+| `GraphDrive.upload(local_path, remote_folder="root", remote_name=None)` | Envia um arquivo local (upload simples, ≤ 4 MB). `remote_folder` aceita `root`, `/Pasta`, `Pasta`, `root:/Pasta` e `root:/Pasta:` |
+| `GraphDrive.read(item_id, encoding=None)` | Retorna o conteúdo textual; detecta charset do `Content-Type` HTTP quando `encoding` não é informado |
+| `GraphDrive.write(item_id, content, encoding=None)` | Sobrescreve o conteúdo; usa `encoding` explícito ou `last_encoding` da última leitura e envia `Content-Type` com charset |
 
 ### `lists.py`
 Operações de listas do SharePoint. Requer `list_id` explícito na construção.

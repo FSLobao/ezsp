@@ -1,40 +1,40 @@
 # Copilot Context — MSGraphClient
 
 Este arquivo resume o estado atual do repositório para manutenção de código e documentação.
-Atualize-o sempre que a superfície pública ou a estrutura do projeto mudar.
+Atualize-o sempre que a superfície pública, dependências ou estrutura do projeto mudarem.
 
 ---
 
 ## Visão Geral
 
-**Objetivo**: biblioteca Python e exemplos para acessar SharePoint via Microsoft Graph com privilégio mínimo, fornecendo uma camada de abstração sobre MSAL para integração em apps desktop e mobile.
+**Objetivo**: biblioteca Python para abstrair autenticação com MSAL e simplificar acesso ao SharePoint Online via Microsoft Graph API, com foco em privilégio mínimo (`Sites.Selected`).
 
-**Modelos suportados**:
-- `GraphClient` como ponto de entrada principal para Microsoft Graph
-- `GraphAuthenticator` para autenticação e descoberta do site
-- `GraphDrive` para operações de biblioteca de documentos
-- `GraphList` para operações de listas do SharePoint
+**Fluxos suportados**:
+- `client_credentials` (app-only)
+- `delegated` (`interactive` ou `device_code`)
 
-**Princípios centrais**:
-- `GraphClient` possui `GraphAuthenticator`.
-- `GraphList` deriva `site_id` do `client.authenticator` quando possível.
-- Não existem mais wrappers de compatibilidade em nível de módulo para drive/list/site.
-- As consultas de listas usam seleção no momento da requisição, evitando filtragem tardia desnecessária.
-- `get_views()` retorna `[]` quando a lista não expõe views.
+**Componentes públicos principais**:
+- `GraphAuthenticator`: aquisição de token e validação de credenciais/configuração.
+- `GraphClient`: sessão HTTP para Graph, helpers de request e normalização de erros HTTP.
+- `GraphDrive`: operações de biblioteca de documentos (navegação, upload/download, leitura/escrita).
+- `GraphList`: operações de listas (schema, views, leitura paginada, validação e save).
 
-No fluxo `delegated`, o acesso efetivo em runtime continua sendo a interseção entre a concessão do aplicativo no site e as permissões do usuário autenticado nesse site.
+No fluxo `delegated`, o acesso efetivo em runtime continua sendo a interseção entre:
+- concessão do aplicativo no site (`Sites.Selected`)
+- permissões reais do usuário autenticado nesse mesmo site.
 
 ---
 
 ## Stack
 
-- Python 3.14.0
-- `uv`
-- `pytest`
+- Python `>=3.11` (README indica testes com 3.14)
+- `uv` (ambiente/dependências)
+- `pytest`, `pytest-cov`, `pytest-mock`
 - `requests`
 - `msal`
-- `pandas`
 - `python-dotenv`
+- `pandas`
+- `python-dateutil`
 
 ---
 
@@ -43,9 +43,14 @@ No fluxo `delegated`, o acesso efetivo em runtime continua sendo a interseção 
 ```text
 MSGraphClient/
 ├── docs/
-├── downloads/
+│   ├── bulk_create_apps.md
+│   ├── getting_started.md
+│   ├── setup_cli.md
+│   ├── setup_delegated_auth.md
+│   └── setup_portal.md
 ├── examples/
 │   ├── example_drive_download.py
+│   ├── example_drive_folder_operations.py
 │   ├── example_drive_list.py
 │   ├── example_drive_read_write.py
 │   ├── example_drive_upload.py
@@ -53,69 +58,101 @@ MSGraphClient/
 │   ├── example_list_get.py
 │   ├── example_list_update.py
 │   ├── example_site_contents.py
+│   ├── list_value_generation.py
+│   └── downloads/
 ├── notebooks/
-│   └── graph_auth_site_attributes.ipynb
+│   ├── graph_auth_site_attributes.ipynb
+│   └── downloads/
 ├── src/
 │   ├── bulkCreate/
-│   └── python/
+│   └── msgraphclient/
 │       ├── __init__.py
 │       ├── auth.py
+│       ├── client.py
 │       ├── drive.py
-│       └── lists.py
+│       ├── lists.py
+│       ├── messages.py
+│       ├── settings.py
+│       └── locales/
 ├── tests/
+│   ├── test_auth.py
+│   ├── test_drive.py
+│   ├── test_graph_client.py
+│   ├── test_lists.py
+│   ├── test_list_value_generation.py
+│   ├── test_settings.py
+│   └── test_site.py
 ├── pyproject.toml
 └── README.md
 ```
 
 ---
 
-## Graph Surface
+## Superfície de API (Atual)
+
+### `src/msgraphclient/client.py`
+- `GraphAuthorizationError` (especializa falhas 401/403).
+- `GraphClient.format_http_error(error)`
+- `GraphClient.get(path, **kwargs)`
+- `GraphClient.post(path, json, **kwargs)`
+- `GraphClient.patch(path, json, **kwargs)`
+- `GraphClient.put_bytes(path, data, content_type=..., **kwargs)`
+- `GraphClient.get_raw(path, **kwargs)`
+- `GraphClient.get_raw_with_encoding(path, **kwargs)`
+
+Também popula atributos de site (`site_graph_id`, `site_name`, `site_display_name`, `site_web_url`, `site_drives`, `site_lists`) quando `SHAREPOINT_SITE_ID` está disponível.
 
 ### `src/msgraphclient/auth.py`
-- `GraphClient` encapsula a sessão HTTP autenticada e a formatação de erros Graph.
-- `GraphAuthenticator` valida config, obtém token e expõe metadados do site.
-- A descoberta do site agora vive em `GraphAuthenticator`.
+- `GraphAuthenticator` com resolução por `GraphSettings` e suporte a `client_credentials` e `delegated`.
+- Reexporta `GraphClient` e `GraphAuthorizationError`.
+- Usa cache de token em memória para fluxo delegado.
 
 ### `src/msgraphclient/drive.py`
-- `GraphDrive.ls(path=None)`
 - `GraphDrive.pwd()`
 - `GraphDrive.cd(path)`
+- `GraphDrive.ls(path=None)`
 - `GraphDrive.download(item_id, local_path)`
 - `GraphDrive.upload(local_path, remote_folder="root", remote_name=None)`
-- `GraphDrive.read(item_id, encoding=None)` — charset auto-detected from HTTP response; stored in `last_encoding`
-- `GraphDrive.write(item_id, content, encoding=None)` — uses `last_encoding` for round-trip fidelity
+- `GraphDrive.read(item_id, encoding=None)`
+- `GraphDrive.write(item_id, content, encoding=None)`
+
+`read()` detecta charset da resposta HTTP quando possível e persiste em `last_encoding`, usado por `write()` quando `encoding` não é informado.
 
 ### `src/msgraphclient/lists.py`
-- `GraphList.get_views()` com fallback seguro para listas sem views
+- `GraphList.get_views()` (com fallback seguro)
 - `GraphList.get_view_columns(view_id)`
-- `GraphList.get_columns(names=None)` com filtro de metadados via Graph
-- `GraphList.get_schema()` e `GraphList.get_field_types()`
-- `GraphList.get_items(select=None, include_id=True)`
-- `GraphList.get_items_dataframe(select=None, include_id=True)`
-- `GraphList.get_item_template(include_optional=True)`
+- `GraphList.get_columns(names=None)`
+- `GraphList.get_schema()`
+- `GraphList.get_field_types()`
 - `GraphList.validate_item(data)`
-- `GraphList.save_item(data)` e `GraphList.save_items(items)`
+- `GraphList.get_items(select=None, include_id=True)`
+- `GraphList.get_item_template(include_optional=True)`
+- `GraphList.get_items_dataframe(select=None, include_id=True)`
 - `GraphList.save_dataframe(dataframe)`
+- `GraphList.save_item(data)`
+- `GraphList.save_items(items)`
 
 ---
 
 ## Documentação e Exemplos
 
-- Os exemplos de Graph foram migrados para uso direto das classes.
-- O notebook `notebooks/graph_auth_site_attributes.ipynb` é a validação end-to-end principal do fluxo SharePoint.
-- O README foi alinhado com a superfície atual e não deve mencionar wrappers de compatibilidade removidos.
+- README concentra onboarding, autenticação (`client_credentials` e `delegated`), execução de exemplos e testes.
+- Notebook principal de validação end-to-end: `notebooks/graph_auth_site_attributes.ipynb`.
+- Guias operacionais estão em `docs/`, incluindo setup por CLI/Portal e criação em lote de apps.
 
 ---
 
 ## Testes e Validação
 
-Comando preferencial:
+Comando recomendado:
 
 ```bash
 uv run pytest tests/
 ```
 
-Estado validado no último sweep: 44 testes passaram.
+Observação desta revisão:
+- A execução local não foi concluída nesta sessão devido a erro de ambiente ao invocar `uv run` (`Failed to canonicalize script path`).
+- Não afirmar contagem de testes aprovados sem nova execução local ou CI.
 
 ---
 
@@ -124,16 +161,16 @@ Estado validado no último sweep: 44 testes passaram.
 Nunca versionar:
 - `.env`
 - caches de token
-- arquivos de saída contendo segredos
+- outputs contendo segredos/tokens
 
-Preferências do projeto:
-- privilégios mínimos
-- grants por site
-- segredos com expiração explícita
+Diretrizes:
+- manter privilégio mínimo (`Sites.Selected`)
+- restringir grants por site
+- usar segredos com rotação/expiração explícita
 
 ---
 
 ## Última Atualização
 
-- Data: 26/05/2026
-- Alteração principal: remoção dos wrappers legados, consolidação da API em classes e atualização dos exemplos/notebooks.
+- Data: 09/06/2026
+- Alteração principal: contexto sincronizado com estrutura atual (`src/msgraphclient`, exemplos e testes), superfície pública revisada e seção de validação ajustada para refletir o estado real da sessão.
